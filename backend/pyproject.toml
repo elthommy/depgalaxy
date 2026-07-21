@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.115",
     "networkx>=3.3",
     "pydantic>=2.7",
+    "requests>=2.34.2",
     "uvicorn>=0.30",
 ]
 
