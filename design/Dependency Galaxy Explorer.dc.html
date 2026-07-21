@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#04050c;overflow:hidden}
+a{color:#67e8f9;text-decoration:none}a:hover{color:#a5f3fc}
+*{box-sizing:border-box}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:rgba(148,163,205,0.25);border-radius:3px}
+::selection{background:rgba(34,211,238,0.3)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.35}}
+</style>
+</helmet>
+<div style="position:relative;width:100vw;height:100vh;overflow:hidden;font-family:'Space Grotesk',sans-serif;color:#e6e9f2;background:radial-gradient(1100px 800px at 72% 28%, rgba(88,28,135,0.20), transparent 62%),radial-gradient(900px 700px at 22% 78%, rgba(8,145,178,0.14), transparent 60%),radial-gradient(closest-side at 50% 45%, #0a0d1c 0%, #04050c 90%)">
+  <canvas ref="{{ canvasRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+
+  <!-- ── Top-left: brand + search ── -->
+  <div style="position:absolute;top:20px;left:20px;width:320px;display:flex;flex-direction:column;gap:10px;z-index:10">
+    <div style="display:flex;align-items:baseline;gap:10px;padding:0 4px">
+      <div style="font-weight:600;letter-spacing:0.22em;font-size:14px;color:#e6e9f2">ORBITAL</div>
+      <div style="font-size:11px;letter-spacing:0.12em;color:#8b93a7;text-transform:uppercase">dependency galaxy</div>
+    </div>
+    <div style="background:rgba(10,14,28,0.55);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(148,163,205,0.16);border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,0.5);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:11px 14px">
+        <svg width="15" height="15" viewBox="0 0 15 15" style="flex:none;opacity:0.6"><circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="#e6e9f2" stroke-width="1.4"></circle><line x1="10" y1="10" x2="13.5" y2="13.5" stroke="#e6e9f2" stroke-width="1.4"></line></svg>
+        <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Search nodes, packs, services…" style="flex:1;background:transparent;border:none;outline:none;color:#e6e9f2;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:300;letter-spacing:0.02em"/>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8b93a7;border:1px solid rgba(148,163,205,0.25);border-radius:5px;padding:2px 6px">⌘K</span>
+      </div>
+      <sc-if value="{{ hasSuggestions }}" hint-placeholder-val="{{ true }}">
+        <div style="border-top:1px solid rgba(148,163,205,0.12);padding:6px">
+          <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="4">
+            <div onClick="{{ s.onPick }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer" style-hover="background:rgba(148,163,205,0.10)">
+              <span style="width:7px;height:7px;border-radius:{{ s.radius }};background:{{ s.color }};box-shadow:0 0 8px {{ s.color }};flex:none"></span>
+              <span style="flex:1;font-size:13px;font-weight:400">{{ s.name }}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8b93a7;text-transform:uppercase;letter-spacing:0.08em">{{ s.kindLabel }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- ── Right: detail panel ── -->
+  <sc-if value="{{ panelOpen }}" hint-placeholder-val="{{ true }}">
+  <div style="position:absolute;top:20px;right:20px;width:326px;max-height:calc(100vh - 260px);display:flex;flex-direction:column;background:rgba(10,14,28,0.55);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(148,163,205,0.16);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.5);z-index:10;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(148,163,205,0.10)">
+      <div style="font-size:10px;letter-spacing:0.2em;color:#8b93a7;text-transform:uppercase">Selection</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div style="display:flex;background:rgba(148,163,205,0.10);border-radius:8px;padding:2px">
+          <button onClick="{{ pickNode }}" style="border:none;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:11px;padding:4px 10px;border-radius:6px;background:{{ nodeTabBg }};color:{{ nodeTabColor }}">Node</button>
+          <button onClick="{{ pickPack }}" style="border:none;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:11px;padding:4px 10px;border-radius:6px;background:{{ packTabBg }};color:{{ packTabColor }}">Pack</button>
+        </div>
+        <button onClick="{{ togglePanel }}" title="Collapse panel" style="border:none;background:transparent;color:#8b93a7;cursor:pointer;font-size:14px;padding:4px" style-hover="color:#e6e9f2">✕</button>
+      </div>
+    </div>
+
+    <sc-if value="{{ isNode }}" hint-placeholder-val="{{ true }}">
+    <div style="overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:#22d3ee;border:1px solid rgba(34,211,238,0.4);border-radius:5px;padding:2px 7px;background:rgba(34,211,238,0.08)">Library</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8b93a7">v3.2.1</span>
+        </div>
+        <div style="font-size:21px;font-weight:500;letter-spacing:0.01em">quark-http</div>
+        <div style="font-size:12px;color:#8b93a7">HTTP client core · <a href="#">core-runtime</a> pack</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="background:rgba(148,163,205,0.07);border-radius:10px;padding:10px 12px"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;color:#22d3ee">142</div><div style="font-size:10px;color:#8b93a7;letter-spacing:0.06em;margin-top:2px">DEPENDENTS</div></div>
+        <div style="background:rgba(148,163,205,0.07);border-radius:10px;padding:10px 12px"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;color:#e6e9f2">9</div><div style="font-size:10px;color:#8b93a7;letter-spacing:0.06em;margin-top:2px">DEPS</div></div>
+        <div style="background:rgba(148,163,205,0.07);border-radius:10px;padding:10px 12px"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;color:#e6e9f2">3</div><div style="font-size:10px;color:#8b93a7;letter-spacing:0.06em;margin-top:2px">HOPS DEEP</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Edge attributes</div>
+        <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;gap:2px">
+          <div style="width:68%;background:#22d3ee;box-shadow:0 0 8px rgba(34,211,238,0.6)"></div>
+          <div style="width:32%;background:repeating-linear-gradient(90deg,#fbbf24 0 5px,transparent 5px 9px)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#8b93a7">
+          <span><span style="color:#22d3ee">●</span> dynamic link · 68%</span>
+          <span><span style="color:#fbbf24">◌</span> static link · 32%</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Direct dependencies · 9</div>
+        <sc-for list="{{ directDeps }}" as="d" hint-placeholder-count="5">
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px" style-hover="background:rgba(148,163,205,0.08)">
+            <span style="width:20px;border-top:{{ d.edgeCss }};box-shadow:0 0 6px {{ d.edgeGlow }};flex:none"></span>
+            <span style="width:6px;height:6px;border-radius:50%;background:{{ d.color }};box-shadow:0 0 6px {{ d.color }};flex:none"></span>
+            <span style="flex:1;font-size:13px">{{ d.name }}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8b93a7;text-transform:uppercase">{{ d.kind }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Reverse dependencies · 142</div>
+        <sc-for list="{{ reverseDeps }}" as="r" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px" style-hover="background:rgba(148,163,205,0.08)">
+            <span style="width:6px;height:6px;border-radius:50%;background:{{ r.color }};box-shadow:0 0 6px {{ r.color }};flex:none"></span>
+            <span style="flex:1;font-size:13px">{{ r.name }}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8b93a7;text-transform:uppercase">{{ r.kind }}</span>
+          </div>
+        </sc-for>
+        <a href="#" style="font-size:12px;padding:2px 8px">+ 137 more</a>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ isPack }}" hint-placeholder-val="{{ false }}">
+    <div style="overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:#e879f9;border:1px solid rgba(232,121,249,0.4);border-radius:5px;padding:2px 7px;background:rgba(232,121,249,0.08)">Pack</span>
+          <span style="font-size:10px;color:#e879f9;letter-spacing:0.08em">◍ expanded · nebula view</span>
+        </div>
+        <div style="font-size:21px;font-weight:500;letter-spacing:0.01em">telemetry-suite</div>
+        <div style="font-size:12px;color:#8b93a7">Observability stack · root-level pack</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div style="background:rgba(148,163,205,0.07);border-radius:10px;padding:10px 12px"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;color:#e879f9">14</div><div style="font-size:10px;color:#8b93a7;letter-spacing:0.06em;margin-top:2px">MEMBERS</div></div>
+        <div style="background:rgba(148,163,205,0.07);border-radius:10px;padding:10px 12px"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;color:#e6e9f2">41</div><div style="font-size:10px;color:#8b93a7;letter-spacing:0.06em;margin-top:2px">EDGES IN</div></div>
+        <div style="background:rgba(148,163,205,0.07);border-radius:10px;padding:10px 12px"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;color:#e6e9f2">27</div><div style="font-size:10px;color:#8b93a7;letter-spacing:0.06em;margin-top:2px">EDGES OUT</div></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Aggregated edge attributes</div>
+        <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;gap:2px">
+          <div style="width:54%;background:#22d3ee;box-shadow:0 0 8px rgba(34,211,238,0.6)"></div>
+          <div style="width:46%;background:repeating-linear-gradient(90deg,#fbbf24 0 5px,transparent 5px 9px)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#8b93a7">
+          <span><span style="color:#22d3ee">●</span> dynamic · 37</span>
+          <span><span style="color:#fbbf24">◌</span> static · 31</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Contained members · 14</div>
+        <sc-for list="{{ packMembers }}" as="m" hint-placeholder-count="7">
+          <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px" style-hover="background:rgba(148,163,205,0.08)">
+            <span style="width:7px;height:7px;border-radius:{{ m.radius }};background:{{ m.color }};box-shadow:0 0 6px {{ m.color }};flex:none"></span>
+            <span style="flex:1;font-size:13px">{{ m.name }}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#8b93a7;text-transform:uppercase">{{ m.kind }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button style="flex:1;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:12px;padding:9px 0;border-radius:9px;border:1px solid rgba(232,121,249,0.4);background:rgba(232,121,249,0.10);color:#f0abfc" style-hover="background:rgba(232,121,249,0.2)">Collapse to orb</button>
+        <button style="flex:1;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:12px;padding:9px 0;border-radius:9px;border:1px solid rgba(148,163,205,0.25);background:transparent;color:#e6e9f2" style-hover="background:rgba(148,163,205,0.1)">Isolate subtree</button>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+  <sc-if value="{{ panelClosed }}" hint-placeholder-val="{{ false }}">
+    <button onClick="{{ togglePanel }}" style="position:absolute;top:20px;right:20px;z-index:10;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:12px;padding:10px 14px;border-radius:12px;border:1px solid rgba(148,163,205,0.16);background:rgba(10,14,28,0.55);backdrop-filter:blur(16px);color:#e6e9f2" style-hover="background:rgba(148,163,205,0.12)">◧ Details</button>
+  </sc-if>
+
+  <!-- ── Bottom-left: legend + depth filter ── -->
+  <div style="position:absolute;bottom:20px;left:20px;width:264px;display:flex;flex-direction:column;gap:14px;background:rgba(10,14,28,0.55);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(148,163,205,0.16);border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,0.5);padding:16px;z-index:10">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Node kinds</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#22d3ee;box-shadow:0 0 8px #22d3ee"></span>library</div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#e879f9;box-shadow:0 0 8px #e879f9"></span>package</div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#fbbf24;box-shadow:0 0 8px #fbbf24"></span>service</div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="width:7px;height:7px;border-radius:50%;background:#a78bfa;box-shadow:0 0 8px #a78bfa"></span>tool</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Edges · depends_on</div>
+      <div style="display:flex;flex-direction:column;gap:7px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;border-top:2px solid #22d3ee;box-shadow:0 0 6px rgba(34,211,238,0.7)"></span>dynamic link</div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="width:26px;border-top:2px dashed #fbbf24;box-shadow:0 0 6px rgba(251,191,36,0.5)"></span>static link</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Packs</div>
+      <div style="display:flex;flex-direction:column;gap:7px;font-size:12px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="width:12px;height:12px;border-radius:50%;background:radial-gradient(circle,#fff 0%,#e879f9 45%,transparent 75%);flex:none;margin:0 7px"></span>collapsed · orb</div>
+        <div style="display:flex;align-items:center;gap:10px"><span style="width:22px;height:22px;border-radius:50%;background:radial-gradient(circle,rgba(232,121,249,0.5),transparent 70%);flex:none;margin:0 2px"></span>expanded · nebula</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;border-top:1px solid rgba(148,163,205,0.12);padding-top:12px">
+      <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Galaxy model</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <sc-for list="{{ galaxyOptions }}" as="g" hint-placeholder-count="4">
+          <button onClick="{{ g.onPick }}" style="cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:11px;padding:6px 0;border-radius:8px;border:1px solid {{ g.border }};background:{{ g.bg }};color:{{ g.color }}" style-hover="border-color:rgba(34,211,238,0.5)">{{ g.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid rgba(148,163,205,0.12);padding-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <div style="font-size:10px;letter-spacing:0.18em;color:#8b93a7;text-transform:uppercase">Depth filter</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#22d3ee">{{ depth }} levels</div>
+      </div>
+      <input type="range" min="1" max="6" step="1" value="{{ depth }}" onChange="{{ onDepth }}" style="width:100%;accent-color:#22d3ee;height:14px;cursor:pointer"/>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:#8b93a7;font-family:'JetBrains Mono',monospace"><span>direct</span><span>full graph</span></div>
+    </div>
+  </div>
+
+  <!-- ── Bottom-right: zoom + collapse toggle ── -->
+  <div style="position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;z-index:10">
+    <div onClick="{{ toggleCollapse }}" style="display:flex;align-items:center;gap:10px;cursor:pointer;background:rgba(10,14,28,0.55);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(148,163,205,0.16);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.5);padding:10px 14px" style-hover="border-color:rgba(232,121,249,0.4)">
+      <span style="font-size:12px;color:#e6e9f2">Collapse all Packs</span>
+      <span style="position:relative;width:34px;height:18px;border-radius:9px;background:{{ trackBg }};transition:background 0.2s;flex:none">
+        <span style="position:absolute;top:2px;left:{{ knobLeft }};width:14px;height:14px;border-radius:50%;background:#e6e9f2;transition:left 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.5)"></span>
+      </span>
+    </div>
+    <div style="display:flex;flex-direction:column;background:rgba(10,14,28,0.55);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(148,163,205,0.16);border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,0.5);overflow:hidden">
+      <button onClick="{{ togglePlay }}" title="{{ playTitle }}" style="width:42px;height:40px;border:none;background:transparent;color:{{ playColor }};font-size:13px;cursor:pointer" style-hover="background:rgba(148,163,205,0.12)">{{ playGlyph }}</button>
+      <button onClick="{{ zoomIn }}" title="Zoom in" style="width:42px;height:40px;border:none;border-top:1px solid rgba(148,163,205,0.12);background:transparent;color:#e6e9f2;font-size:17px;cursor:pointer" style-hover="background:rgba(148,163,205,0.12)">+</button>
+      <button onClick="{{ zoomOut }}" title="Zoom out" style="width:42px;height:40px;border:none;border-top:1px solid rgba(148,163,205,0.12);background:transparent;color:#e6e9f2;font-size:17px;cursor:pointer" style-hover="background:rgba(148,163,205,0.12)">−</button>
+      <button onClick="{{ zoomFit }}" title="Fit to view" style="width:42px;height:40px;border:none;border-top:1px solid rgba(148,163,205,0.12);background:transparent;color:#8b93a7;font-size:13px;cursor:pointer" style-hover="background:rgba(148,163,205,0.12);color:#e6e9f2">⤢</button>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#8b93a7;padding-right:4px">2,047 nodes · 5,318 edges · <span style="color:#4ade80;animation:blink 2.4s infinite">●</span> live</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: &quot;100%&quot;, &quot;height&quot;: &quot;100%&quot;}, &quot;galaxyType&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;spiral-2&quot;, &quot;spiral-3&quot;, &quot;ring&quot;, &quot;cartwheel&quot;], &quot;default&quot;: &quot;spiral-3&quot;, &quot;tsType&quot;: &quot;'spiral-2'|'spiral-3'|'ring'|'cartwheel'&quot;, &quot;section&quot;: &quot;Galaxy&quot;}, &quot;selection&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;node&quot;, &quot;pack&quot;], &quot;default&quot;: &quot;node&quot;, &quot;tsType&quot;: &quot;'node'|'pack'&quot;, &quot;section&quot;: &quot;Demo state&quot;}, &quot;packsCollapsed&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Demo state&quot;}, &quot;rotationSpeed&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 1, &quot;min&quot;: 0, &quot;max&quot;: 3, &quot;step&quot;: 0.1, &quot;unit&quot;: &quot;x&quot;, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;Motion&quot;}}">
+class Component extends DCLogic {
+  state = { query: 'tele', depth: 3, panelOpen: true, sel: null, collapsed: null, zoom: 1, playing: true, galaxyType: null };
+  canvasRef = React.createRef();
+
+  componentDidMount() {
+    const cv = this.canvasRef.current;
+    if (!cv) return;
+    this.cv = cv; this.ctx = cv.getContext('2d');
+    this._resize = () => {
+      const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+      cv.width = r.width * d; cv.height = r.height * d;
+      this.W = r.width; this.H = r.height; this.dpr = d;
+    };
+    this._resize();
+    window.addEventListener('resize', this._resize);
+    this.buildGalaxy();
+    this.sprites = {};
+    ['#22d3ee', '#e879f9', '#fbbf24', '#a78bfa', '#ffffff'].forEach(c => this.sprites[c] = this.makeSprite(c));
+    const loop = (t) => { this.draw(t); this.raf = requestAnimationFrame(loop); };
+    this.raf = requestAnimationFrame(loop);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); window.removeEventListener('resize', this._resize); }
+  componentDidUpdate(prevProps) {
+    if (prevProps && prevProps.galaxyType !== this.props.galaxyType && this.nodes) this.buildGalaxy();
+  }
+
+  makeSprite(color) {
+    const s = document.createElement('canvas'); s.width = s.height = 64;
+    const c = s.getContext('2d');
+    let g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.18, color); g.addColorStop(0.45, color + '55'); g.addColorStop(1, color + '00');
+    c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+    return s;
+  }
+
+  buildGalaxy() {
+    let seed = 1337; const R = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+    const gauss = () => (R() + R() + R() - 1.5) / 1.5;
+    const type = this.state.galaxyType ?? this.props.galaxyType ?? 'spiral-3';
+    const kinds = ['#22d3ee', '#22d3ee', '#e879f9', '#fbbf24', '#a78bfa'];
+    const N = 2000, nodes = [];
+    for (let i = 0; i < N; i++) {
+      let r, th;
+      if (type === 'ring') { r = 330 + gauss() * 65; th = R() * Math.PI * 2; }
+      else if (type === 'cartwheel') {
+        const u = R();
+        if (u < 0.22) { r = Math.pow(R(), 2) * 95 + 6; th = R() * Math.PI * 2; }
+        else if (u < 0.42) { th = Math.floor(R() * 8) * (Math.PI / 4) + gauss() * 0.045; r = 95 + R() * 290; }
+        else { r = 385 + gauss() * 40; th = R() * Math.PI * 2; }
+      } else {
+        const arms = type === 'spiral-2' ? 2 : 3;
+        r = Math.pow(R(), 2.2) * 560 + 8;
+        th = Math.floor(R() * arms) * (Math.PI * 2 / arms) + r * 0.0052 + gauss() * (0.35 + r / 900);
+      }
+      nodes.push({
+        x: Math.cos(th) * r, z: Math.sin(th) * r,
+        y: gauss() * 42 * (1 - Math.min(1, r / 750)),
+        color: kinds[Math.floor(R() * kinds.length)],
+        size: 1.1 + Math.pow(R(), 4) * 7,
+        phase: R() * Math.PI * 2, tw: 0.5 + R() * 1.5,
+        pack: 0
+      });
+    }
+    // expanded packs (nebulas) with contained member nodes
+    const packDefs = [
+      { name: 'telemetry-suite', color: '#e879f9', c: { x: -235, y: -18, z: 130 }, members: ['trace-agent', 'span-store', 'metric-sink', 'log-fanout', 'otel-bridge', 'sampler-core', 'clock-sync', 'dash-render'] },
+      { name: 'aws-sdk', color: '#fbbf24', c: { x: 155, y: 24, z: 305 }, members: ['s3', 'dynamodb', 'sqs', 'kinesis', 'lambda', 'aws-core', 'aws-crt', 'aws-auth'] },
+      { name: 'abseil', color: '#22d3ee', c: { x: -330, y: 10, z: -225 }, members: ['absl::strings', 'absl::container', 'absl::sync', 'absl::time', 'absl::hash', 'absl::flags'] },
+      { name: 'boost', color: '#a78bfa', c: { x: 70, y: -30, z: -345 }, members: ['boost::asio', 'boost::beast', 'boost::filesystem', 'boost::regex', 'boost::spirit', 'boost::smart_ptr'] }
+    ];
+    let ni = 40;
+    this.packs = packDefs.map(pd => {
+      const members = pd.members.map(mn => {
+        const n = nodes[ni++];
+        n.x = pd.c.x + gauss() * 46; n.y = pd.c.y + gauss() * 24; n.z = pd.c.z + gauss() * 46;
+        n.color = R() < 0.5 ? pd.color : kinds[Math.floor(R() * kinds.length)];
+        n.size = 2 + R() * 3.5; n.pack = 1; n.label = mn;
+        return n;
+      });
+      return { name: pd.name, c: pd.c, color: pd.color, members, rad: 80 + pd.members.length * 6 };
+    });
+    // collapsed pack orb
+    this.orb = { x: 265, y: 34, z: -110, size: 15 };
+    // selected node
+    const sel = nodes[300];
+    sel.x = -60; sel.y = 8; sel.z = -230; sel.size = 6.5; sel.color = '#22d3ee';
+    this.selNode = sel;
+    for (const n of nodes) {
+      const dx = n.x - sel.x, dy = n.y - sel.y, dz = n.z - sel.z;
+      n.depth = Math.min(6, 1 + Math.floor(Math.sqrt(dx * dx + dy * dy + dz * dz) / 150));
+    }
+    // edges: prefer near neighbours
+    const edges = [];
+    for (let i = 0; i < 560; i++) {
+      const a = nodes[Math.floor(R() * N)];
+      let best = null, bd = 1e9;
+      for (let k = 0; k < 14; k++) {
+        const b = nodes[Math.floor(R() * N)];
+        if (b === a) continue;
+        const d = (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2;
+        if (d < bd) { bd = d; best = b; }
+      }
+      if (best) edges.push({ a, b: best, dyn: R() < 0.65 });
+    }
+    // highlighted edges from selected node
+    for (let i = 0; i < 6; i++) {
+      let best = null, bd = 1e9;
+      for (let k = 0; k < 40; k++) {
+        const b = nodes[Math.floor(R() * N)];
+        const d = (sel.x - b.x) ** 2 + (sel.y - b.y) ** 2 + (sel.z - b.z) ** 2;
+        if (d < bd && b !== sel && d > 900) { bd = d; best = b; }
+      }
+      if (best) edges.push({ a: sel, b: best, dyn: i < 4, hi: true });
+    }
+    // aggregated edges from orb
+    this.orbEdges = [];
+    for (let i = 0; i < 8; i++) this.orbEdges.push(nodes[Math.floor(R() * N)]);
+    this.nodes = nodes; this.edges = edges;
+  }
+
+  proj(x, y, z, rot) {
+    const c = Math.cos(rot), s = Math.sin(rot);
+    let X = x * c - z * s, Z = x * s + z * c;
+    const pc = Math.cos(0.42), ps = Math.sin(0.42);
+    let Y = y * pc - Z * ps; Z = y * ps + Z * pc;
+    const sc = 900 / (900 + Z + 720);
+    if (sc <= 0.05) return null;
+    const zoom = this.state.zoom;
+    return { x: this.W / 2 + X * sc * zoom, y: this.H / 2 + Y * sc * zoom, s: sc * zoom };
+  }
+
+  draw(t) {
+    const ctx = this.ctx; if (!ctx) return;
+    const speed = this.props.rotationSpeed ?? 1;
+    if (this._lastT === undefined) { this._lastT = t; this._rot = 0; }
+    if (this.state.playing) this._rot += (t - this._lastT) * 0.000045 * speed;
+    this._lastT = t;
+    const rot = this._rot;
+    const depth = this.state.depth;
+    const collapsed = this.state.collapsed ?? this.props.packsCollapsed ?? false;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, this.W, this.H);
+    ctx.globalCompositeOperation = 'lighter';
+    const P = this.nodes.map(n => this.proj(n.x, n.y, n.z, rot));
+    // packs: nebula halos + "contains" links when expanded, bright orbs when collapsed
+    ctx.font = '11px "JetBrains Mono", monospace';
+    for (const pk of this.packs) {
+      const c = this.proj(pk.c.x, pk.c.y, pk.c.z, rot);
+      if (!c) continue;
+      if (!collapsed) {
+        const rad = pk.rad * c.s;
+        const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, rad);
+        g.addColorStop(0, pk.color + '2e'); g.addColorStop(0.6, pk.color + '14'); g.addColorStop(1, pk.color + '00');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y, rad, 0, 7); ctx.fill();
+        ctx.strokeStyle = pk.color + '3c'; ctx.lineWidth = 0.8; ctx.setLineDash([2, 4]);
+        for (const m of pk.members) {
+          const p = this.proj(m.x, m.y, m.z, rot); if (!p) continue;
+          ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+        }
+        ctx.setLineDash([]); ctx.lineWidth = 1;
+        ctx.fillStyle = pk.color + 'c0';
+        ctx.fillText('◍ ' + pk.name, c.x - 30, c.y - rad - 8);
+      } else {
+        const r = 21 * c.s;
+        ctx.drawImage(this.sprites['#ffffff'], c.x - r, c.y - r, r * 2, r * 2);
+        const spr = this.sprites[pk.color] || this.sprites['#e879f9'];
+        const r2 = r * 0.72;
+        ctx.drawImage(spr, c.x - r2, c.y - r2, r2 * 2, r2 * 2);
+        ctx.strokeStyle = pk.color + '80'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(c.x, c.y, r * 0.62, 0, 7); ctx.stroke();
+        ctx.fillStyle = pk.color + 'c0';
+        ctx.fillText('● ' + pk.name, c.x + r * 0.7 + 6, c.y + 4);
+      }
+    }
+    const drawEdges = (dashed) => {
+      ctx.setLineDash(dashed ? [4, 6] : []);
+      ctx.lineWidth = 1;
+      for (const e of this.edges) {
+        if (e.dyn === dashed) continue;
+        const pa = this.proj(e.a.x, e.a.y, e.a.z, rot), pb = this.proj(e.b.x, e.b.y, e.b.z, rot);
+        if (!pa || !pb) continue;
+        const dOk = Math.min(e.a.depth, e.b.depth) <= depth;
+        let al = (dOk ? 0.13 : 0.02) * Math.min(1, (pa.s + pb.s));
+        if (e.hi) { al = 0.55; ctx.lineWidth = 1.4; }
+        ctx.strokeStyle = dashed ? `rgba(251,191,36,${al})` : `rgba(34,211,238,${al})`;
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+        if (e.hi) ctx.lineWidth = 1;
+      }
+    };
+    drawEdges(false); drawEdges(true);
+    ctx.setLineDash([]);
+    // aggregated orb edges
+    const oc = this.proj(this.orb.x, this.orb.y, this.orb.z, rot);
+    if (oc) {
+      ctx.lineWidth = 1.8;
+      for (const n of this.orbEdges) {
+        const p = this.proj(n.x, n.y, n.z, rot); if (!p) continue;
+        ctx.strokeStyle = 'rgba(34,211,238,0.28)';
+        ctx.beginPath(); ctx.moveTo(oc.x, oc.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+      }
+      ctx.lineWidth = 1;
+    }
+    // nodes
+    const ts = t * 0.001;
+    for (let i = 0; i < this.nodes.length; i++) {
+      const n = this.nodes[i], p = P[i]; if (!p) continue;
+      if (collapsed && n.pack) continue;
+      const dim = n.depth <= depth ? 1 : 0.14;
+      const tw = 0.72 + 0.28 * Math.sin(ts * n.tw + n.phase);
+      ctx.globalAlpha = Math.min(1, dim * tw * (0.35 + p.s));
+      const r = n.size * p.s * 2.6;
+      ctx.drawImage(this.sprites[n.color], p.x - r, p.y - r, r * 2, r * 2);
+    }
+    ctx.globalAlpha = 1;
+    // collapsed pack orb
+    if (oc) {
+      const r = (collapsed ? 24 : 17) * oc.s;
+      ctx.drawImage(this.sprites['#ffffff'], oc.x - r, oc.y - r, r * 2, r * 2);
+      const r2 = r * 0.72;
+      ctx.drawImage(this.sprites['#e879f9'], oc.x - r2, oc.y - r2, r2 * 2, r2 * 2);
+      ctx.strokeStyle = 'rgba(240,171,252,0.5)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(oc.x, oc.y, r * 0.62, 0, 7); ctx.stroke();
+      ctx.fillStyle = 'rgba(240,171,252,0.75)'; ctx.font = '11px "JetBrains Mono", monospace';
+      ctx.fillText('● payments-core', oc.x + r * 0.7 + 6, oc.y + 4);
+    }
+    // selected node highlight
+    const sp = this.proj(this.selNode.x, this.selNode.y, this.selNode.z, rot);
+    if (sp) {
+      ctx.strokeStyle = 'rgba(34,211,238,0.85)'; ctx.lineWidth = 1.2;
+      const rr = 14 * sp.s + 6 + Math.sin(ts * 2) * 1.5;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, rr, 0, 7); ctx.stroke();
+      ctx.strokeStyle = 'rgba(34,211,238,0.35)';
+      ctx.beginPath(); ctx.moveTo(sp.x + rr + 4, sp.y); ctx.lineTo(sp.x + rr + 26, sp.y); ctx.stroke();
+      ctx.fillStyle = 'rgba(165,243,252,0.95)'; ctx.font = '12px "JetBrains Mono", monospace';
+      ctx.fillText('quark-http', sp.x + rr + 32, sp.y + 4);
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  renderVals() {
+    const kindColors = { library: '#22d3ee', package: '#e879f9', service: '#fbbf24', tool: '#a78bfa', pack: '#f0abfc' };
+    const sel = this.state.sel ?? this.props.selection ?? 'node';
+    const collapsed = this.state.collapsed ?? this.props.packsCollapsed ?? false;
+    const base = [
+      { name: 'telemetry-suite', kind: 'pack' }, { name: 'aws-sdk', kind: 'pack' },
+      { name: 'abseil', kind: 'pack' }, { name: 'boost', kind: 'pack' }, { name: 'template-core', kind: 'package' },
+      { name: 'telnet-shim', kind: 'library' }, { name: 'tempo-worker', kind: 'service' }
+    ];
+    const q = this.state.query.toLowerCase();
+    const suggestions = base.filter(s => s.name.includes(q)).map(s => ({
+      name: s.name, kindLabel: s.kind, color: kindColors[s.kind],
+      radius: s.kind === 'pack' ? '2px' : '50%',
+      onPick: () => this.setState({ sel: s.kind === 'pack' ? 'pack' : 'node', panelOpen: true })
+    }));
+    const dep = (name, kind, dyn) => ({
+      name, kind, color: kindColors[kind],
+      edgeCss: dyn ? '2px solid #22d3ee' : '2px dashed #fbbf24',
+      edgeGlow: dyn ? 'rgba(34,211,238,0.7)' : 'rgba(251,191,36,0.5)'
+    });
+    return {
+      canvasRef: this.canvasRef,
+      query: this.state.query,
+      onQuery: (e) => this.setState({ query: e.target.value }),
+      hasSuggestions: this.state.query.length > 0 && suggestions.length > 0,
+      suggestions,
+      panelOpen: this.state.panelOpen, panelClosed: !this.state.panelOpen,
+      togglePanel: () => this.setState(s => ({ panelOpen: !s.panelOpen })),
+      isNode: sel === 'node', isPack: sel === 'pack',
+      pickNode: () => this.setState({ sel: 'node' }),
+      pickPack: () => this.setState({ sel: 'pack' }),
+      nodeTabBg: sel === 'node' ? 'rgba(34,211,238,0.18)' : 'transparent',
+      nodeTabColor: sel === 'node' ? '#a5f3fc' : '#8b93a7',
+      packTabBg: sel === 'pack' ? 'rgba(232,121,249,0.18)' : 'transparent',
+      packTabColor: sel === 'pack' ? '#f0abfc' : '#8b93a7',
+      directDeps: [
+        dep('quark-tls', 'library', true), dep('quark-dns', 'library', true),
+        dep('uri-parse', 'library', true), dep('metric-sink', 'service', true),
+        dep('zlib-port', 'package', false), dep('proto-gen', 'tool', false)
+      ],
+      reverseDeps: [
+        { name: 'gateway-api', kind: 'service', color: kindColors.service },
+        { name: 'batch-runner', kind: 'service', color: kindColors.service },
+        { name: 'ui-shell', kind: 'package', color: kindColors.package },
+        { name: 'sched-core', kind: 'library', color: kindColors.library },
+        { name: 'edge-cache', kind: 'service', color: kindColors.service }
+      ],
+      packMembers: [
+        { name: 'trace-agent', kind: 'service' }, { name: 'span-store', kind: 'library' },
+        { name: 'metric-sink', kind: 'service' }, { name: 'log-fanout', kind: 'service' },
+        { name: 'otel-bridge', kind: 'package' }, { name: 'sampler-core', kind: 'library' },
+        { name: 'exporters', kind: 'pack' }, { name: 'clock-sync', kind: 'library' },
+        { name: 'dash-render', kind: 'tool' }
+      ].map(m => ({ ...m, color: kindColors[m.kind], radius: m.kind === 'pack' ? '2px' : '50%' })),
+      depth: this.state.depth,
+      onDepth: (e) => this.setState({ depth: +e.target.value }),
+      toggleCollapse: () => this.setState({ collapsed: !collapsed }),
+      trackBg: collapsed ? 'rgba(232,121,249,0.6)' : 'rgba(148,163,205,0.25)',
+      knobLeft: collapsed ? '18px' : '2px',
+      galaxyOptions: [
+        { id: 'spiral-2', label: 'Spiral · 2 arms' }, { id: 'spiral-3', label: 'Spiral · 3 arms' },
+        { id: 'ring', label: 'Ring' }, { id: 'cartwheel', label: 'Cartwheel' }
+      ].map(o => {
+        const cur = (this.state.galaxyType ?? this.props.galaxyType ?? 'spiral-3') === o.id;
+        return {
+          label: o.label,
+          bg: cur ? 'rgba(34,211,238,0.14)' : 'transparent',
+          border: cur ? 'rgba(34,211,238,0.5)' : 'rgba(148,163,205,0.2)',
+          color: cur ? '#a5f3fc' : '#8b93a7',
+          onPick: () => this.setState({ galaxyType: o.id }, () => this.buildGalaxy())
+        };
+      }),
+      togglePlay: () => this.setState(s => ({ playing: !s.playing })),
+      playGlyph: this.state.playing ? '❚❚' : '▶',
+      playColor: this.state.playing ? '#e6e9f2' : '#22d3ee',
+      playTitle: this.state.playing ? 'Pause rotation' : 'Play rotation',
+      zoomIn: () => this.setState(s => ({ zoom: Math.min(2.6, s.zoom * 1.25) })),
+      zoomOut: () => this.setState(s => ({ zoom: Math.max(0.45, s.zoom / 1.25) })),
+      zoomFit: () => this.setState({ zoom: 1 })
+    };
+  }
+}
+</script>
+</body>
+</html>
