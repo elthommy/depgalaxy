@@ -238,15 +238,31 @@ def test_node_details_leaf(galaxy):
     assert details.parent.id == "lib"
     assert not details.is_pack
     assert [d.id for d in details.deps] == ["l2"]
+    assert details.deps[0].link_type is None
     assert {d.id for d in details.reverse_deps} == {"a1", "a2"}
+    assert details.reverse_deps[0].link_type == "dynamic"
+    assert details.edges_in == 2 and details.edges_out == 1
     assert details.edge_attrs == {"link_type": {"dynamic": 2}}
 
 
-def test_node_details_pack(galaxy):
+def test_node_details_pack_aggregates_external_edges(galaxy):
     details = node_details(galaxy, "app")
     assert details.is_pack
     assert {m.id for m in details.members} == {"a1", "a2"}
     assert details.parent is None
+    # crossing edges: a1->l1, a2->l1, a1->l3 out; s1->a1 in; a1->a2 internal excluded
+    assert [d.id for d in details.deps] == ["l1", "l3"]
+    assert [d.link_type for d in details.deps] == ["dynamic", "static"]
+    assert [r.id for r in details.reverse_deps] == ["s1"]
+    assert details.edges_out == 3 and details.edges_in == 1
+    assert details.edge_attrs == {"link_type": {"dynamic": 2, "static": 1}}
+
+
+def test_node_details_nested_pack_includes_subpack_members(galaxy):
+    details = node_details(galaxy, "lib")
+    assert {d.id for d in details.deps} == {"s1"}  # l2->s1
+    assert {r.id for r in details.reverse_deps} == {"a1", "a2"}
+    assert details.edges_in == 3 and details.edges_out == 1
 
 
 def test_node_details_dedupes_repeated_deps():

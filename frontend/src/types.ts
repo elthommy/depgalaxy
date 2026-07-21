@@ -30,6 +30,10 @@ export interface NodeRef {
   kind: string;
 }
 
+export interface DepRef extends NodeRef {
+  link_type: string | null;
+}
+
 export interface NodeDetails {
   id: string;
   label: string;
@@ -38,7 +42,9 @@ export interface NodeDetails {
   is_pack: boolean;
   parent: NodeRef | null;
   members: NodeRef[];
-  deps: NodeRef[];
-  reverse_deps: NodeRef[];
+  deps: DepRef[];
+  reverse_deps: DepRef[];
+  edges_in: number;
+  edges_out: number;
   edge_attrs: Record<string, Record<string, number>>;
 }

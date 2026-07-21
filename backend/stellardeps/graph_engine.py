@@ -65,8 +65,18 @@ class NodeRef(BaseModel):
     kind: str
 
 
+class DepRef(NodeRef):
+    """A dependency reference including the connecting edge's link type."""
+
+    link_type: str | None = None
+
+
 class NodeDetails(BaseModel):
-    """The detail payload returned by GET /node/{id}."""
+    """The detail payload returned by GET /node/{id}.
+
+    For packs, deps/reverse_deps/edge counts aggregate the members'
+    external edges (edges crossing the pack boundary).
+    """
 
     id: str
     label: str
@@ -75,8 +85,10 @@ class NodeDetails(BaseModel):
     is_pack: bool = False
     parent: NodeRef | None = None
     members: list[NodeRef] = Field(default_factory=list)
-    deps: list[NodeRef] = Field(default_factory=list)
-    reverse_deps: list[NodeRef] = Field(default_factory=list)
+    deps: list[DepRef] = Field(default_factory=list)
+    reverse_deps: list[DepRef] = Field(default_factory=list)
+    edges_in: int = 0
+    edges_out: int = 0
     edge_attrs: dict[str, dict[str, int]] = Field(default_factory=dict)
 
 
@@ -238,12 +250,13 @@ def _view_node(
 
 
 def node_details(graph: DepGraph, node_id: str) -> NodeDetails:
-    """Return the detail payload for a single node (or Pack)."""
+    """Return details for one node; packs aggregate their members' external edges."""
     if node_id not in graph.nodes:
         raise GraphValidationError(f"unknown node: {node_id!r}")
     node = graph.nodes[node_id]
-    out_edges = [e for e in graph.edges if e.source == node_id]
-    in_edges = [e for e in graph.edges if e.target == node_id]
+    scope = {node_id} | (_descendants(graph, node_id) if is_pack(graph, node_id) else set())
+    out_edges = [e for e in graph.edges if e.source in scope and e.target not in scope]
+    in_edges = [e for e in graph.edges if e.target in scope and e.source not in scope]
     parent_id = graph.parent.get(node_id)
     return NodeDetails(
         id=node.id,
@@ -253,10 +266,24 @@ def node_details(graph: DepGraph, node_id: str) -> NodeDetails:
         is_pack=is_pack(graph, node_id),
         parent=_ref(graph, parent_id) if parent_id else None,
         members=[_ref(graph, member) for member in graph.children.get(node_id, ())],
-        deps=_unique_refs(graph, (e.target for e in out_edges)),
-        reverse_deps=_unique_refs(graph, (e.source for e in in_edges)),
+        deps=_dep_refs(graph, out_edges, "target"),
+        reverse_deps=_dep_refs(graph, in_edges, "source"),
+        edges_in=len(in_edges),
+        edges_out=len(out_edges),
         edge_attrs=_attr_breakdown(out_edges + in_edges),
     )
+
+
+def _descendants(graph: DepGraph, pack_id: str) -> set[str]:
+    """Return all transitive members of a pack."""
+    found: set[str] = set()
+    stack = [pack_id]
+    while stack:
+        for child in graph.children.get(stack.pop(), ()):
+            if child not in found:
+                found.add(child)
+                stack.append(child)
+    return found
 
 
 def _ref(graph: DepGraph, node_id: str) -> NodeRef:
@@ -265,15 +292,20 @@ def _ref(graph: DepGraph, node_id: str) -> NodeRef:
     return NodeRef(id=node.id, label=node.label, kind=node.kind)
 
 
-def _unique_refs(graph: DepGraph, node_ids: Iterable[str]) -> list[NodeRef]:
-    """Build NodeRefs for the given ids, deduplicated while preserving order."""
-    seen: set[str] = set()
-    refs = []
-    for node_id in node_ids:
-        if node_id not in seen:
-            seen.add(node_id)
-            refs.append(_ref(graph, node_id))
-    return refs
+def _dep_refs(graph: DepGraph, edges: list[Edge], endpoint: str) -> list[DepRef]:
+    """Build deduplicated DepRefs for one edge endpoint, keeping the first link_type seen."""
+    refs: dict[str, DepRef] = {}
+    for edge in edges:
+        node_id = edge.target if endpoint == "target" else edge.source
+        if node_id not in refs:
+            node = graph.nodes[node_id]
+            refs[node_id] = DepRef(
+                id=node.id,
+                label=node.label,
+                kind=node.kind,
+                link_type=edge.attrs.get("link_type"),
+            )
+    return list(refs.values())
 
 
 def _attr_breakdown(edges: list[Edge]) -> dict[str, dict[str, int]]:

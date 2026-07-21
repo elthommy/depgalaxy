@@ -1,47 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import type { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-3d";
 import * as THREE from "three";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { fetchGraph } from "./api";
+import { DYNAMIC_EDGE, STATIC_EDGE, kindColor } from "./palette";
 import { useGalaxyStore } from "./store";
 import type { GraphView, ViewEdge, ViewNode } from "./types";
 
 const BACKGROUND = "#04050c";
 
-const KIND_COLORS: Record<string, string> = {
-  library: "#60a5fa",
-  package: "#c084fc",
-  service: "#f472b6",
-  tool: "#34d399",
-  binary: "#fbbf24",
-};
-const FALLBACK_COLORS = ["#93c5fd", "#a5b4fc", "#f9a8d4", "#86efac", "#fcd34d", "#67e8f9"];
-
-function kindColor(kind: string): string {
-  const known = KIND_COLORS[kind];
-  if (known) return known;
-  let hash = 0;
-  for (const ch of kind) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
-  return FALLBACK_COLORS[Math.abs(hash) % FALLBACK_COLORS.length];
-}
-
 interface NodeData extends ViewNode {
   fanIn: number;
   color: string;
 }
-type GNode = NodeObject<NodeData>;
-type GLink = LinkObject<NodeData, ViewEdge>;
-type FGMethods = ForceGraphMethods<GNode, GLink>;
+export type GNode = NodeObject<NodeData>;
+export type GLink = LinkObject<NodeData, ViewEdge>;
+export type FGMethods = ForceGraphMethods<GNode, GLink>;
 
 // Shared link materials: dynamic = solid cyan, static = dashed amber.
 const dynamicLinkMaterial = new THREE.LineBasicMaterial({
-  color: 0x22d3ee,
+  color: new THREE.Color(DYNAMIC_EDGE),
   transparent: true,
   opacity: 0.45,
 });
 const staticLinkMaterial = new THREE.LineDashedMaterial({
-  color: 0xfbbf24,
+  color: new THREE.Color(STATIC_EDGE),
   transparent: true,
   opacity: 0.6,
   dashSize: 2,
@@ -123,32 +106,17 @@ function toGraphData(view: GraphView): { nodes: GNode[]; links: GLink[] } {
   return { nodes, links: view.edges.map((e) => ({ ...e })) };
 }
 
-export default function GalaxyCanvas() {
-  const fgRef = useRef<FGMethods | undefined>(undefined);
-  const [view, setView] = useState<GraphView | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const collapsed = useGalaxyStore((s) => s.collapsed);
-  const depth = useGalaxyStore((s) => s.depth);
-  const root = useGalaxyStore((s) => s.root);
+export default function GalaxyCanvas({
+  fgRef,
+}: {
+  fgRef: React.MutableRefObject<FGMethods | undefined>;
+}) {
+  const view = useGalaxyStore((s) => s.view);
+  const viewError = useGalaxyStore((s) => s.viewError);
+  const focus = useGalaxyStore((s) => s.focus);
+  const autoRotate = useGalaxyStore((s) => s.autoRotate);
   const togglePack = useGalaxyStore((s) => s.togglePack);
   const select = useGalaxyStore((s) => s.select);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchGraph({ collapsed, depth, root })
-      .then((v) => {
-        if (cancelled) return;
-        setView(v);
-        setError(null);
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [collapsed, depth, root]);
 
   // Bloom pass over the whole scene.
   useEffect(() => {
@@ -164,9 +132,36 @@ export default function GalaxyCanvas() {
     return () => {
       fg.postProcessingComposer().removePass(bloom);
     };
-  }, []);
+  }, [fgRef]);
+
+  // Slow galaxy rotation, toggled by the play/pause control.
+  useEffect(() => {
+    const controls = fgRef.current?.controls() as
+      | { autoRotate: boolean; autoRotateSpeed: number }
+      | undefined;
+    if (!controls) return;
+    controls.autoRotate = autoRotate;
+    controls.autoRotateSpeed = 0.5;
+  }, [fgRef, autoRotate]);
 
   const graphData = useMemo(() => (view ? toGraphData(view) : { nodes: [], links: [] }), [view]);
+
+  // Fly the camera to a node picked from the search panel or a detail-panel row.
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg || !focus) return;
+    const node = graphData.nodes.find((n) => n.id === focus.id);
+    if (!node || node.x === undefined || node.y === undefined || node.z === undefined) return;
+    const distance = 90;
+    const len = Math.hypot(node.x, node.y, node.z) || 1;
+    const ratio = 1 + distance / len;
+    fg.cameraPosition(
+      { x: node.x * ratio, y: node.y * ratio, z: node.z * ratio },
+      { x: node.x, y: node.y, z: node.z },
+      1200,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus]);
 
   const onNodeClick = useCallback(
     (node: GNode) => {
@@ -196,7 +191,7 @@ export default function GalaxyCanvas() {
         onBackgroundClick={() => select(null)}
         warmupTicks={60}
       />
-      {error && (
+      {viewError && !view && (
         <div
           style={{
             position: "absolute",
@@ -204,12 +199,12 @@ export default function GalaxyCanvas() {
             display: "grid",
             placeItems: "center",
             color: "#7d8ec7",
-            fontFamily: "monospace",
+            fontFamily: "'JetBrains Mono', monospace",
             pointerEvents: "none",
           }}
         >
           <div style={{ textAlign: "center" }}>
-            <p>no galaxy loaded — {error}</p>
+            <p>no galaxy loaded — {viewError}</p>
             <p>run `make seed` with the backend up, then reload</p>
           </div>
         </div>

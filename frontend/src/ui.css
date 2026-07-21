@@ -1,0 +1,93 @@
+/* Global styles ported from the design export (design/Dependency Galaxy Explorer.dc.html). */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Space Grotesk", sans-serif;
+  color: #e6e9f2;
+}
+
+a {
+  color: #67e8f9;
+  text-decoration: none;
+}
+a:hover {
+  color: #a5f3fc;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 205, 0.25);
+  border-radius: 3px;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.3);
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Glassmorphic panel shell shared by all four overlay panels. */
+.glass {
+  background: rgba(10, 14, 28, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 163, 205, 0.16);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+.section-title {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: #8b93a7;
+  text-transform: uppercase;
+}
+
+.mono {
+  font-family: "JetBrains Mono", monospace;
+}
+
+.hover-row {
+  border-radius: 8px;
+  cursor: pointer;
+}
+.hover-row:hover {
+  background: rgba(148, 163, 205, 0.08);
+}
+
+.ghost-button {
+  border: none;
+  background: transparent;
+  color: #e6e9f2;
+  cursor: pointer;
+}
+.ghost-button:hover {
+  background: rgba(148, 163, 205, 0.12);
+}
+
+/* Subtle colored nebula tints from the design background, over the 3D canvas. */
+.bg-tint {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(1100px 800px at 72% 28%, rgba(88, 28, 135, 0.2), transparent 62%),
+    radial-gradient(900px 700px at 22% 78%, rgba(8, 145, 178, 0.14), transparent 60%);
+  mix-blend-mode: screen;
+}
