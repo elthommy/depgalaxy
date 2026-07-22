@@ -11,6 +11,7 @@ export default function LegendPanel() {
   const setDepth = useGalaxyStore((s) => s.setDepth);
   const root = useGalaxyStore((s) => s.root);
   const setRoot = useGalaxyStore((s) => s.setRoot);
+  const selectedId = useGalaxyStore((s) => s.selectedId);
 
   const kinds = useMemo(() => {
     const seen = new Set<string>();
@@ -23,6 +24,11 @@ export default function LegendPanel() {
   const rootLabel = useMemo(
     () => view?.nodes.find((n) => n.id === root)?.label ?? root,
     [view, root],
+  );
+
+  const selectedLabel = useMemo(
+    () => view?.nodes.find((n) => n.id === selectedId)?.label ?? selectedId,
+    [view, selectedId],
   );
 
   const sliderValue = depth === null ? FULL_DEPTH : Math.min(depth, FULL_DEPTH);
@@ -135,7 +141,6 @@ export default function LegendPanel() {
           gap: 6,
           borderTop: "1px solid rgba(148,163,205,0.12)",
           paddingTop: 12,
-          opacity: root === null ? 0.5 : 1,
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -150,7 +155,6 @@ export default function LegendPanel() {
           max={FULL_DEPTH}
           step={1}
           value={sliderValue}
-          disabled={root === null}
           onChange={(e) => {
             const v = Number(e.target.value);
             setDepth(v === FULL_DEPTH ? null : v);
@@ -164,11 +168,7 @@ export default function LegendPanel() {
           <span>direct</span>
           <span>full graph</span>
         </div>
-        {root === null ? (
-          <div style={{ fontSize: 11, color: MUTED }}>
-            Isolate a pack’s subtree to enable depth filtering.
-          </div>
-        ) : (
+        {root !== null ? (
           <div style={{ fontSize: 11, color: MUTED, display: "flex", alignItems: "center", gap: 6 }}>
             <span>
               root: <span style={{ color: "#a5f3fc" }}>{rootLabel}</span>
@@ -183,6 +183,12 @@ export default function LegendPanel() {
               ✕ clear
             </a>
           </div>
+        ) : depth !== null && selectedId !== null ? (
+          <div style={{ fontSize: 11, color: MUTED }}>
+            relative to: <span style={{ color: "#a5f3fc" }}>{selectedLabel}</span>
+          </div>
+        ) : (
+          <div style={{ fontSize: 11, color: MUTED }}>scope: global · top-level nodes</div>
         )}
       </div>
     </div>

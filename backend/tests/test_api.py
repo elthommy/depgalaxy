@@ -83,10 +83,17 @@ def test_graph_depth_and_root():
     assert {n["id"] for n in view["nodes"]} == {"a1", "a2", "x"}
 
 
+def test_graph_depth_without_root_slices_from_top_level():
+    import_payload()
+    view = client.get("/graph", params={"depth": 0}).json()
+    # app (no edges) and a1 (no incoming edge) are the top level
+    assert {n["id"] for n in view["nodes"]} == {"app", "a1"}
+
+
 def test_graph_bad_params_are_400():
     import_payload()
     assert client.get("/graph", params={"collapsed": "ghost"}).status_code == 400
-    assert client.get("/graph", params={"depth": 2}).status_code == 400
+    assert client.get("/graph", params={"depth": -1}).status_code == 400
     assert client.get("/graph", params={"root": "ghost"}).status_code == 400
 
 
@@ -96,6 +103,7 @@ def test_node_details():
     assert details["parent"]["id"] == "app"
     assert [d["id"] for d in details["deps"]] == ["x", "a2"]
     assert details["edge_attrs"] == {"link_type": {"dynamic": 1}}
+    assert details["hops_deep"] == 0
 
 
 def test_node_pack_details():

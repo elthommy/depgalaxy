@@ -90,6 +90,7 @@ class NodeDetails(BaseModel):
     edges_in: int = 0
     edges_out: int = 0
     edge_attrs: dict[str, dict[str, int]] = Field(default_factory=dict)
+    hops_deep: int | None = None
 
 
 def build_graph(payload: GraphPayload) -> DepGraph:
@@ -146,14 +147,23 @@ def compute_view(
     depth: int | None = None,
     root: str | None = None,
 ) -> GraphView:
-    """Compute a view: collapse packs, aggregate edges, optionally slice by depth from root."""
+    """Compute a view: collapse packs, aggregate edges, optionally slice by depth.
+
+    With a `root`, the slice keeps nodes within `depth` dependency hops of it.
+    Without one, `depth` slices from the view's top-level nodes (no incoming
+    edge); a view with no top level (pure cycle) is returned unsliced.
+    """
     collapsed_set = frozenset(collapsed)
     _check_view_params(graph, collapsed_set, depth, root)
     rep = {nid: _representative(graph, nid, collapsed_set) for nid in graph.nodes}
     visible = set(rep.values())
     edges = _aggregate_edges(graph, rep)
     if root is not None:
-        visible, edges = _slice_depth(edges, rep[root], depth)
+        visible, edges = _slice_depth(edges, {rep[root]}, depth)
+    elif depth is not None:
+        top = _top_level(visible, edges)
+        if top:
+            visible, edges = _slice_depth(edges, top, depth)
     nodes = [_view_node(graph, nid, collapsed_set, visible) for nid in sorted(visible)]
     return GraphView(nodes=nodes, edges=edges)
 
@@ -169,8 +179,6 @@ def _check_view_params(
             raise GraphValidationError(f"collapsed node is not a pack: {pack_id!r}")
     if root is not None and root not in graph.nodes:
         raise GraphValidationError(f"unknown root node: {root!r}")
-    if depth is not None and root is None:
-        raise GraphValidationError("depth requires a root node")
     if depth is not None and depth < 0:
         raise GraphValidationError("depth must be >= 0")
 
@@ -208,15 +216,21 @@ def _common_attrs(edges: list[Edge]) -> dict:
     return common
 
 
+def _top_level(visible: set[str], edges: list[ViewEdge]) -> set[str]:
+    """Return the visible nodes with no incoming view edge (the view's top level)."""
+    targets = {edge.target for edge in edges}
+    return {nid for nid in visible if nid not in targets}
+
+
 def _slice_depth(
-    edges: list[ViewEdge], root: str, depth: int | None
+    edges: list[ViewEdge], roots: set[str], depth: int | None
 ) -> tuple[set[str], list[ViewEdge]]:
-    """Keep only nodes within `depth` dependency hops of `root` (all hops if depth is None)."""
+    """Keep only nodes within `depth` dependency hops of `roots` (all hops if depth is None)."""
     adjacency: dict[str, list[str]] = {}
     for edge in edges:
         adjacency.setdefault(edge.source, []).append(edge.target)
-    kept = {root}
-    frontier = [root]
+    kept = set(roots)
+    frontier = list(roots)
     level = 0
     while frontier and (depth is None or level < depth):
         next_frontier = []
@@ -271,7 +285,27 @@ def node_details(graph: DepGraph, node_id: str) -> NodeDetails:
         edges_in=len(in_edges),
         edges_out=len(out_edges),
         edge_attrs=_attr_breakdown(out_edges + in_edges),
+        hops_deep=_hops_deep(graph, node_id),
     )
+
+
+def _hops_deep(graph: DepGraph, node_id: str) -> int | None:
+    """BFS distance of a node from the in-degree-0 top level; None if unreachable (cycles)."""
+    targets = {edge.target for edge in graph.edges}
+    dist = {nid: 0 for nid in graph.nodes if nid not in targets}
+    adjacency: dict[str, list[str]] = {}
+    for edge in graph.edges:
+        adjacency.setdefault(edge.source, []).append(edge.target)
+    frontier = list(dist)
+    while frontier:
+        next_frontier = []
+        for source in frontier:
+            for target in adjacency.get(source, ()):
+                if target not in dist:
+                    dist[target] = dist[source] + 1
+                    next_frontier.append(target)
+        frontier = next_frontier
+    return dist.get(node_id)
 
 
 def _descendants(graph: DepGraph, pack_id: str) -> set[str]:

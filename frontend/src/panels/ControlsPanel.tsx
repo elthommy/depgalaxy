@@ -3,7 +3,51 @@ import type { FGMethods } from "../GalaxyCanvas";
 import { MUTED, PACK_ACCENT, TEXT, withAlpha } from "../palette";
 import { useGalaxyStore } from "../store";
 
-/** Bottom-right: collapse-all toggle, rotation/zoom controls, live stats. */
+function ToggleRow({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <div
+      className="glass"
+      onClick={onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        cursor: "pointer",
+        borderRadius: 12,
+        padding: "10px 14px",
+      }}
+    >
+      <span style={{ fontSize: 12, color: TEXT }}>{label}</span>
+      <span
+        style={{
+          position: "relative",
+          width: 34,
+          height: 18,
+          borderRadius: 9,
+          background: on ? withAlpha(PACK_ACCENT, 0.6) : "rgba(148,163,205,0.25)",
+          transition: "background 0.2s",
+          flex: "none",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: on ? 18 : 2,
+            width: 14,
+            height: 14,
+            borderRadius: "50%",
+            background: TEXT,
+            transition: "left 0.2s",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.5)",
+          }}
+        />
+      </span>
+    </div>
+  );
+}
+
+/** Bottom-right: collapse-all + label toggles, rotation/zoom controls, live stats. */
 export default function ControlsPanel({
   fgRef,
 }: {
@@ -15,6 +59,8 @@ export default function ControlsPanel({
   const expandAll = useGalaxyStore((s) => s.expandAll);
   const autoRotate = useGalaxyStore((s) => s.autoRotate);
   const setAutoRotate = useGalaxyStore((s) => s.setAutoRotate);
+  const showLabels = useGalaxyStore((s) => s.showLabels);
+  const setShowLabels = useGalaxyStore((s) => s.setShowLabels);
 
   const allCollapsed = useMemo(() => {
     const packs = (view?.nodes ?? []).filter((n) => n.is_pack);
@@ -44,45 +90,12 @@ export default function ControlsPanel({
         zIndex: 10,
       }}
     >
-      <div
-        className="glass"
+      <ToggleRow
+        label="Collapse all Packs"
+        on={allCollapsed}
         onClick={() => (allCollapsed ? expandAll() : collapseAll())}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          cursor: "pointer",
-          borderRadius: 12,
-          padding: "10px 14px",
-        }}
-      >
-        <span style={{ fontSize: 12, color: TEXT }}>Collapse all Packs</span>
-        <span
-          style={{
-            position: "relative",
-            width: 34,
-            height: 18,
-            borderRadius: 9,
-            background: allCollapsed ? withAlpha(PACK_ACCENT, 0.6) : "rgba(148,163,205,0.25)",
-            transition: "background 0.2s",
-            flex: "none",
-          }}
-        >
-          <span
-            style={{
-              position: "absolute",
-              top: 2,
-              left: allCollapsed ? 18 : 2,
-              width: 14,
-              height: 14,
-              borderRadius: "50%",
-              background: TEXT,
-              transition: "left 0.2s",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.5)",
-            }}
-          />
-        </span>
-      </div>
+      />
+      <ToggleRow label="Show names" on={showLabels} onClick={() => setShowLabels(!showLabels)} />
 
       <div className="glass" style={{ display: "flex", flexDirection: "column", borderRadius: 12, overflow: "hidden" }}>
         <button

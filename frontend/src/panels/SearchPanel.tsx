@@ -30,14 +30,9 @@ export default function SearchPanel() {
   return (
     <div
       style={{
-        position: "absolute",
-        top: 20,
-        left: 20,
-        width: 320,
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        zIndex: 10,
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "0 4px" }}>

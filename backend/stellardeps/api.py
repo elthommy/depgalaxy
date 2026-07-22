@@ -6,7 +6,8 @@ v1); every view is recomputed from it on each request.
 
 from fastapi import FastAPI, HTTPException
 
-from stellardeps import graph_engine
+from stellardeps import feeds, graph_engine
+from stellardeps.feeds import FeedInfo, FeedUnavailableError
 from stellardeps.graph_engine import DepGraph, GraphValidationError, GraphView, NodeDetails
 from stellardeps.models import GraphPayload
 
@@ -22,24 +23,48 @@ def _require_graph() -> DepGraph:
     return _current_graph
 
 
+def _install_graph(payload: GraphPayload) -> dict[str, int]:
+    """Build a graph from a payload, make it current, and return its counts."""
+    global _current_graph
+    graph = graph_engine.build_graph(payload)
+    _current_graph = graph
+    return {"nodes": len(graph.nodes), "edges": len(graph.edges), "packs": len(graph.children)}
+
+
 @app.post("/import")
 def import_graph(payload: GraphPayload) -> dict[str, int]:
     """Validate and load a graph, replacing any previously imported one."""
-    global _current_graph
     try:
-        graph = graph_engine.build_graph(payload)
+        return _install_graph(payload)
     except GraphValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    _current_graph = graph
-    return {"nodes": len(graph.nodes), "edges": len(graph.edges), "packs": len(graph.children)}
+
+
+@app.get("/feeds")
+def get_feeds() -> list[FeedInfo]:
+    """List the predefined feeds that can be loaded via POST /feeds/{id}/run."""
+    return feeds.list_feeds()
+
+
+@app.post("/feeds/{feed_id}/run")
+def run_feed(feed_id: str) -> dict[str, int]:
+    """Build a predefined feed and load it, replacing the current graph."""
+    try:
+        payload = feeds.build_feed(feed_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=f"unknown feed: {feed_id!r}") from exc
+    except FeedUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=f"feed unavailable: {exc}") from exc
+    return _install_graph(payload)
 
 
 @app.get("/graph")
 def get_graph(collapsed: str = "", depth: int | None = None, root: str | None = None) -> GraphView:
     """Compute the current view — a pure function of (graph, params).
 
-    `collapsed` is a comma-separated list of pack ids; `depth` and `root`
-    optionally limit the view to N levels of transitive deps from root.
+    `collapsed` is a comma-separated list of pack ids; `depth` limits the
+    view to N levels of transitive deps from `root`, or from the view's
+    top-level nodes when `root` is omitted.
     """
     graph = _require_graph()
     collapsed_ids = [pack_id for pack_id in collapsed.split(",") if pack_id]

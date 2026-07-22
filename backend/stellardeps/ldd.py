@@ -1,8 +1,32 @@
 """Parse `ldd` output into a Stellardeps GraphPayload."""
 
 import re
+import subprocess
+from pathlib import Path
 
 from stellardeps.models import Edge, GraphPayload, Node
+
+
+class LddError(RuntimeError):
+    """Raised when ldd cannot be run on a binary."""
+
+
+def run_ldd(binary: str) -> str:
+    """Run ldd on `binary` and return its stdout; raise LddError on failure."""
+    try:
+        result = subprocess.run(["ldd", binary], capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        raise LddError("ldd is not installed") from exc
+    if result.returncode != 0:
+        detail = result.stderr.strip() or f"ldd exited with {result.returncode}"
+        raise LddError(f"ldd failed on {binary!r}: {detail}")
+    return result.stdout
+
+
+def ldd_payload(binary: str) -> GraphPayload:
+    """Run ldd on `binary` and parse the output into a payload rooted at its basename."""
+    return parse_ldd(run_ldd(binary), root=Path(binary).name)
+
 
 _LDD_DEP = re.compile(r"^(?P<name>\S+)(?:\s*=>\s*(?P<path>\S+))?\s*(?:\(0x[0-9a-fA-F]+\))?$")
 _SKIP_MARKERS = ("statically linked", "not a dynamic executable")

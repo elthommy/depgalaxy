@@ -3,6 +3,7 @@ import ForceGraph3D from "react-force-graph-3d";
 import type { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-3d";
 import * as THREE from "three";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import SpriteText from "three-spritetext";
 import { DYNAMIC_EDGE, STATIC_EDGE, kindColor } from "./palette";
 import { useGalaxyStore } from "./store";
 import type { GraphView, ViewEdge, ViewNode } from "./types";
@@ -93,6 +94,18 @@ function packObject(node: GNode): THREE.Object3D {
   return group;
 }
 
+// muted so the bloom pass doesn't turn labels into glare
+const LABEL_COLOR = "#c7d2fe";
+
+/** Name sprite shown above a node when the "Show names" toggle is on. */
+function makeLabel(node: GNode): SpriteText {
+  const label = new SpriteText(node.label, node.is_pack ? 4 : 3, LABEL_COLOR);
+  label.material.depthWrite = false;
+  // packs: clear their sphere (radius 5 + sqrt(members)); plain nodes: small offset
+  label.position.y = node.is_pack ? 9 + Math.sqrt(node.member_count) : 4;
+  return label;
+}
+
 function toGraphData(view: GraphView): { nodes: GNode[]; links: GLink[] } {
   const fanIn = new Map<string, number>();
   for (const edge of view.edges) {
@@ -117,6 +130,7 @@ export default function GalaxyCanvas({
   const autoRotate = useGalaxyStore((s) => s.autoRotate);
   const togglePack = useGalaxyStore((s) => s.togglePack);
   const select = useGalaxyStore((s) => s.select);
+  const showLabels = useGalaxyStore((s) => s.showLabels);
 
   // Bloom pass over the whole scene.
   useEffect(() => {
@@ -171,6 +185,20 @@ export default function GalaxyCanvas({
     [togglePack, select],
   );
 
+  // new function identity on toggle makes react-force-graph rebuild node objects
+  const nodeThreeObject = useCallback(
+    (node: GNode) => {
+      if (node.is_pack) {
+        const obj = packObject(node);
+        if (showLabels) obj.add(makeLabel(node));
+        return obj;
+      }
+      // returning a falsy value means "use the default sphere"; the typings don't admit it
+      return showLabels ? makeLabel(node) : (undefined as unknown as THREE.Object3D);
+    },
+    [showLabels],
+  );
+
   return (
     <div style={{ position: "fixed", inset: 0 }}>
       <ForceGraph3D<NodeData, ViewEdge>
@@ -180,10 +208,9 @@ export default function GalaxyCanvas({
         nodeLabel={(node) => `${node.label} · ${node.kind}${node.is_pack ? " (pack)" : ""}`}
         nodeColor={(node) => node.color}
         nodeVal={(node) => 1 + Math.min(node.fanIn, 50) * 0.8}
-        // returning a falsy value means "use the default sphere"; the typings don't admit it
-        nodeThreeObject={(node) =>
-          node.is_pack ? packObject(node) : (undefined as unknown as THREE.Object3D)
-        }
+        nodeThreeObject={nodeThreeObject}
+        // packs replace the default object; plain nodes keep their sphere under the label
+        nodeThreeObjectExtend={(node) => !node.is_pack}
         nodeOpacity={0.85}
         linkMaterial={linkMaterial}
         linkWidth={0}

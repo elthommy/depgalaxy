@@ -5,11 +5,16 @@ interface GalaxyState {
   // view parameters (drive /graph refetches)
   collapsed: string[];
   depth: number | null;
+  // explicit isolation root; when null and a depth limit is active, the
+  // selected node (if any) becomes the slice root, else the slice is global
   root: string | null;
+  // bumped when a feed replaces the server-side graph, to force a refetch
+  graphEpoch: number;
   // ui state
   selectedId: string | null;
   focus: { id: string; seq: number } | null;
   autoRotate: boolean;
+  showLabels: boolean;
   // last fetched view (shared by canvas + panels)
   view: GraphView | null;
   viewError: string | null;
@@ -22,17 +27,21 @@ interface GalaxyState {
   select: (id: string | null) => void;
   focusNode: (id: string) => void;
   setAutoRotate: (on: boolean) => void;
+  setShowLabels: (on: boolean) => void;
   setView: (view: GraphView) => void;
   setViewError: (error: string | null) => void;
+  loadNewGraph: () => void;
 }
 
 export const useGalaxyStore = create<GalaxyState>((set, get) => ({
   collapsed: [],
   depth: null,
   root: null,
+  graphEpoch: 0,
   selectedId: null,
   focus: null,
   autoRotate: true,
+  showLabels: false,
   view: null,
   viewError: null,
 
@@ -56,6 +65,17 @@ export const useGalaxyStore = create<GalaxyState>((set, get) => ({
   focusNode: (id) =>
     set((state) => ({ selectedId: id, focus: { id, seq: (state.focus?.seq ?? 0) + 1 } })),
   setAutoRotate: (on) => set({ autoRotate: on }),
+  setShowLabels: (on) => set({ showLabels: on }),
   setView: (view) => set({ view, viewError: null }),
   setViewError: (error) => set({ viewError: error }),
+  // reset every view parameter tied to the replaced graph and refetch
+  loadNewGraph: () =>
+    set((state) => ({
+      collapsed: [],
+      depth: null,
+      root: null,
+      selectedId: null,
+      focus: null,
+      graphEpoch: state.graphEpoch + 1,
+    })),
 }));

@@ -1,12 +1,10 @@
 """Import the dynamic dependencies of a local binary (via `ldd`) into Stellardeps."""
 
 import argparse
-import subprocess
-from pathlib import Path
 
 import requests
 
-from stellardeps.ldd import parse_ldd
+from stellardeps.ldd import ldd_payload
 
 
 def main() -> None:
@@ -15,8 +13,7 @@ def main() -> None:
     parser.add_argument("binary", help="path to a dynamically linked executable")
     parser.add_argument("--url", default="http://127.0.0.1:8000", help="backend base URL")
     args = parser.parse_args()
-    result = subprocess.run(["ldd", args.binary], capture_output=True, text=True, check=True)
-    payload = parse_ldd(result.stdout, root=Path(args.binary).name)
+    payload = ldd_payload(args.binary)
     response = requests.post(f"{args.url}/import", json=payload.model_dump(), timeout=30)
     response.raise_for_status()
     print(f"imported: {response.json()}")

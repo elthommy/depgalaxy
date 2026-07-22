@@ -47,4 +47,19 @@ export interface NodeDetails {
   edges_in: number;
   edges_out: number;
   edge_attrs: Record<string, Record<string, number>>;
+  hops_deep: number | null;
+}
+
+export interface FeedInfo {
+  id: string;
+  label: string;
+  description: string;
+  kind: string;
+  available: boolean;
+}
+
+export interface ImportCounts {
+  nodes: number;
+  edges: number;
+  packs: number;
 }

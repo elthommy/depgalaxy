@@ -34,11 +34,19 @@ function KindBadge({ label, color }: { label: string; color: string }) {
   );
 }
 
-function StatTile({ value, label, color }: { value: number; label: string; color?: string }) {
+function StatTile({
+  value,
+  label,
+  color,
+}: {
+  value: number | string;
+  label: string;
+  color?: string;
+}) {
   return (
     <div style={{ background: "rgba(148,163,205,0.07)", borderRadius: 10, padding: "10px 12px" }}>
       <div className="mono" style={{ fontSize: 17, color: color ?? TEXT }}>
-        {value.toLocaleString("en-US")}
+        {typeof value === "number" ? value.toLocaleString("en-US") : value}
       </div>
       <div style={{ fontSize: 10, color: MUTED, letterSpacing: "0.06em", marginTop: 2 }}>
         {label}
@@ -365,7 +373,7 @@ export default function DetailPanel() {
             <>
               <StatTile value={details.reverse_deps.length} label="DEPENDENTS" color={DYNAMIC_EDGE} />
               <StatTile value={details.deps.length} label="DEPS" />
-              <StatTile value={details.edges_in + details.edges_out} label="EDGES" />
+              <StatTile value={details.hops_deep ?? "—"} label="HOPS DEEP" />
             </>
           )}
         </div>

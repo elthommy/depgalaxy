@@ -215,9 +215,40 @@ def test_root_inside_collapsed_pack_slices_from_pack(galaxy):
     assert view_ids(view) == {"app", "l1", "l3"}
 
 
-def test_depth_without_root_rejected(galaxy):
-    with pytest.raises(GraphValidationError, match="depth requires a root"):
-        compute_view(galaxy, depth=2)
+def test_depth_without_root_slices_from_top_level():
+    # a -> b -> c plus isolated x; top level = {a, x}
+    payload = make_payload(["a", "b", "c", "x"], edges=[("a", "b", {}), ("b", "c", {})])
+    view = compute_view(build_graph(payload), depth=1)
+    assert view_ids(view) == {"a", "b", "x"}
+
+
+def test_depth_zero_without_root_keeps_only_top_level():
+    payload = make_payload(["a", "b", "c", "x"], edges=[("a", "b", {}), ("b", "c", {})])
+    view = compute_view(build_graph(payload), depth=0)
+    assert view_ids(view) == {"a", "x"}
+    assert view.edges == []
+
+
+def test_depth_without_root_respects_collapse():
+    payload = make_payload(["p", "m", "x"], edges=[("m", "x", {})], containment=[("p", "m")])
+    graph = build_graph(payload)
+    # uncollapsed: p (no edges) and m (no incoming) are both top level
+    assert view_ids(compute_view(graph, depth=0)) == {"p", "m"}
+    # collapsed: the aggregated edge p->x makes p the only top-level node
+    assert view_ids(compute_view(graph, collapsed=["p"], depth=0)) == {"p"}
+
+
+def test_depth_without_root_pure_cycle_falls_back_to_full_view():
+    payload = make_payload(["a", "b", "c"], edges=[("a", "b", {}), ("b", "c", {}), ("c", "a", {})])
+    view = compute_view(build_graph(payload), depth=1)
+    assert view_ids(view) == {"a", "b", "c"}
+
+
+def test_depth_without_root_on_galaxy_keeps_packs(galaxy):
+    # every non-pack fixture node sits on a cycle, so only the edge-less
+    # packs are top level
+    view = compute_view(galaxy, depth=1)
+    assert view_ids(view) == {"app", "lib", "libsub"}
 
 
 def test_negative_depth_rejected(galaxy):
@@ -274,3 +305,21 @@ def test_node_details_dedupes_repeated_deps():
 def test_node_details_unknown_node(galaxy):
     with pytest.raises(GraphValidationError, match="unknown node"):
         node_details(galaxy, "ghost")
+
+
+def test_hops_deep_top_level_and_chain():
+    payload = make_payload(["a", "b", "c"], edges=[("a", "b", {}), ("b", "c", {})])
+    graph = build_graph(payload)
+    assert node_details(graph, "a").hops_deep == 0
+    assert node_details(graph, "b").hops_deep == 1
+    assert node_details(graph, "c").hops_deep == 2
+
+
+def test_hops_deep_is_shortest_distance():
+    payload = make_payload(["a", "b", "c"], edges=[("a", "b", {}), ("b", "c", {}), ("a", "c", {})])
+    assert node_details(build_graph(payload), "c").hops_deep == 1
+
+
+def test_hops_deep_none_inside_pure_cycle():
+    payload = make_payload(["a", "b"], edges=[("a", "b", {}), ("b", "a", {})])
+    assert node_details(build_graph(payload), "a").hops_deep is None
