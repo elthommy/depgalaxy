@@ -25,8 +25,18 @@ def test_list_feeds_returns_registry():
     response = client.get("/feeds")
     assert response.status_code == 200
     listed = {f["id"]: f for f in response.json()}
-    assert set(listed) == {"demo-small", "demo-medium", "demo-large", "ldd-ls", "ldd-python3"}
+    assert set(listed) == {
+        "demo-small",
+        "demo-medium",
+        "demo-large",
+        "arch-core",
+        "arch-core-extra",
+        "arch-installed",
+        "ldd-ls",
+        "ldd-python3",
+    }
     assert listed["demo-small"]["kind"] == "demo"
+    assert listed["arch-core"]["kind"] == "pacman"
     assert listed["ldd-ls"]["kind"] == "ldd"
     assert all(f["available"] for f in listed.values() if f["kind"] == "demo")
 
@@ -51,6 +61,13 @@ def test_run_unavailable_feed_is_503(monkeypatch):
     response = client.post("/feeds/ldd-ls/run")
     assert response.status_code == 503
     assert "ldd is not installed" in response.json()["detail"]
+
+
+def test_pacman_feed_unavailable_without_sync_db(tmp_path, monkeypatch):
+    monkeypatch.setattr(feeds.pacman, "SYNC_DB_DIR", tmp_path)
+    response = client.post("/feeds/arch-core/run")
+    assert response.status_code == 503
+    assert "missing pacman sync db: core.db" in response.json()["detail"]
 
 
 def test_run_ldd_success(monkeypatch):

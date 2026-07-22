@@ -7,6 +7,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from stellardeps import pacman
 from stellardeps.ldd import LddError, ldd_payload
 from stellardeps.models import GraphPayload
 from stellardeps.seed import generate_demo_graph
@@ -64,6 +65,45 @@ def _ldd_check(binary: str) -> str | None:
     return None
 
 
+def _pacman_sync_check(repos: list[str]) -> str | None:
+    """Return why the sync databases for `repos` cannot be read, or None."""
+    for repo in repos:
+        if not (pacman.SYNC_DB_DIR / f"{repo}.db").exists():
+            return f"missing pacman sync db: {repo}.db"
+    return None
+
+
+def _pacman_sync_feed(feed_id: str, label: str, repos: list[str]) -> Feed:
+    """Build a feed over one or more pacman sync repositories."""
+    return Feed(
+        id=feed_id,
+        label=label,
+        description=f"Arch Linux packages of {' + '.join(repos)} with their dependencies",
+        kind="pacman",
+        build=lambda: pacman.sync_payload(repos),
+        check=lambda: _pacman_sync_check(repos),
+    )
+
+
+def _pacman_installed_check() -> str | None:
+    """Return why the local pacman database cannot be read, or None."""
+    if not pacman.LOCAL_DB_DIR.is_dir():
+        return f"missing pacman local db: {pacman.LOCAL_DB_DIR}"
+    return None
+
+
+def _pacman_installed_feed() -> Feed:
+    """Build the feed over the locally installed packages."""
+    return Feed(
+        id="arch-installed",
+        label="Arch Linux · installed packages",
+        description="packages installed on this machine with their dependencies",
+        kind="pacman",
+        build=pacman.installed_payload,
+        check=_pacman_installed_check,
+    )
+
+
 def _ldd_feed(feed_id: str, binary: str) -> Feed:
     """Build a feed that imports one binary's dynamic libraries via ldd."""
     return Feed(
@@ -82,6 +122,9 @@ FEEDS: dict[str, Feed] = {
         _demo_feed("demo-small", "Demo galaxy (small)", 500, 8),
         _demo_feed("demo-medium", "Demo galaxy (medium)", 2000, 15),
         _demo_feed("demo-large", "Demo galaxy (large)", 5000, 25),
+        _pacman_sync_feed("arch-core", "Arch Linux · core", ["core"]),
+        _pacman_sync_feed("arch-core-extra", "Arch Linux · core + extra", ["core", "extra"]),
+        _pacman_installed_feed(),
         _ldd_feed("ldd-ls", "/bin/ls"),
         _ldd_feed("ldd-python3", "/usr/bin/python3"),
     )
