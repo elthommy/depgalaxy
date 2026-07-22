@@ -50,12 +50,21 @@ def strip_constraint(spec: str) -> str:
     return spec
 
 
+# (desc section, link_type, edge relation): hard deps, optional deps, conflicts
+_EDGE_SECTIONS = (
+    ("DEPENDS", "hard", "depends_on"),
+    ("OPTDEPENDS", "optional", "depends_on"),
+    ("CONFLICTS", "conflicts", "conflicts_with"),
+)
+
+
 def build_payload(repos: list[tuple[str, list[dict[str, list[str]]]]]) -> GraphPayload:
     """Build a payload from (repo, desc entries) pairs; node kind is the repo name.
 
-    Dependency specs are resolved through package names first, then
-    %PROVIDES% entries (virtual packages, shared libraries); unresolvable
-    specs are dropped. On duplicate package names the first repo wins.
+    %DEPENDS%, %OPTDEPENDS%, and %CONFLICTS% become typed edges. Specs are
+    resolved through package names first, then %PROVIDES% entries (virtual
+    packages, shared libraries); unresolvable specs are dropped. On
+    duplicate package names the first repo wins.
     """
     nodes: dict[str, Node] = {}
     descs: dict[str, dict[str, list[str]]] = {}
@@ -75,17 +84,30 @@ def build_payload(repos: list[tuple[str, list[dict[str, list[str]]]]]) -> GraphP
 
 
 def _dep_edges(descs: dict[str, dict[str, list[str]]], provides: dict[str, str]) -> list[Edge]:
-    """Resolve every %DEPENDS% spec into deduplicated edges, dropping unresolvable ones."""
+    """Resolve dependency and conflict specs into typed, deduplicated edges.
+
+    Sections are processed in _EDGE_SECTIONS order, so a package that is
+    both a hard and an optional dependency keeps the hard edge.
+    """
     edges: list[Edge] = []
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str, str, str]] = set()
     for name, desc in descs.items():
-        for spec in desc.get("DEPENDS", []):
-            dep = strip_constraint(spec)
-            target = dep if dep in descs else provides.get(dep)
-            if target is None or target == name or (name, target) in seen:
-                continue
-            seen.add((name, target))
-            edges.append(Edge(source=name, target=target))
+        for section, link_type, relation in _EDGE_SECTIONS:
+            for spec in desc.get(section, []):
+                # optdepends specs read "package: reason" — drop the reason
+                dep = strip_constraint(spec.split(":")[0].strip())
+                target = dep if dep in descs else provides.get(dep)
+                if target is None or target == name or (name, target, relation) in seen:
+                    continue
+                seen.add((name, target, relation))
+                edges.append(
+                    Edge(
+                        source=name,
+                        target=target,
+                        relation=relation,
+                        attrs={"link_type": link_type},
+                    )
+                )
     return edges
 
 

@@ -14,8 +14,25 @@ export const PACK_ACCENT = "#e879f9";
 export const PACK_ACCENT_LIGHT = "#f0abfc";
 export const DYNAMIC_EDGE = "#22d3ee";
 export const STATIC_EDGE = "#fbbf24";
+export const CONFLICT_EDGE = "#f87171";
 export const TEXT = "#e6e9f2";
 export const MUTED = "#8b93a7";
+
+export interface LinkStyle {
+  color: string;
+  dashed: boolean;
+  label: string;
+}
+
+// Edge styling per link_type; declaration order drives display order in
+// the legend and the edge-attribute bars.
+export const LINK_STYLES: Record<string, LinkStyle> = {
+  dynamic: { color: DYNAMIC_EDGE, dashed: false, label: "dynamic link" },
+  static: { color: STATIC_EDGE, dashed: true, label: "static link" },
+  hard: { color: DYNAMIC_EDGE, dashed: false, label: "hard dep" },
+  optional: { color: STATIC_EDGE, dashed: true, label: "optional dep" },
+  conflicts: { color: CONFLICT_EDGE, dashed: false, label: "conflicts" },
+};
 
 export function kindColor(kind: string): string {
   const known = KIND_COLORS[kind];

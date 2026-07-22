@@ -18,6 +18,13 @@ libreadline.so=8-64
 glibc>=2.38
 ghost-pkg
 
+%OPTDEPENDS%
+zsh: a fancier shell
+
+%CONFLICTS%
+glibc<2.0
+bash-legacy
+
 %PROVIDES%
 sh
 """
@@ -42,6 +49,9 @@ glibc
 
 %DEPENDS%
 sh
+
+%OPTDEPENDS%
+readline: history support
 """
 
 
@@ -71,6 +81,8 @@ def test_parse_desc_sections():
     assert desc["NAME"] == ["bash"]
     assert desc["VERSION"] == ["5.3.15-1"]
     assert desc["DEPENDS"] == ["readline", "libreadline.so=8-64", "glibc>=2.38", "ghost-pkg"]
+    assert desc["OPTDEPENDS"] == ["zsh: a fancier shell"]
+    assert desc["CONFLICTS"] == ["glibc<2.0", "bash-legacy"]
     assert desc["PROVIDES"] == ["sh"]
 
 
@@ -92,10 +104,17 @@ def test_build_payload_resolves_names_provides_and_drops_dangling(core_db):
     assert all(n.kind == "core" for n in payload.nodes)
     versions = {n.id: n.attrs["version"] for n in payload.nodes}
     assert versions["bash"] == "5.3.15-1"
-    edges = {(e.source, e.target) for e in payload.edges}
-    # readline named + libreadline.so provide deduped to one edge; ghost-pkg dropped;
-    # glibc's `sh` dep resolves to bash via its provide
-    assert edges == {("bash", "readline"), ("bash", "glibc"), ("glibc", "bash")}
+    edges = {(e.source, e.target, e.relation, e.attrs["link_type"]) for e in payload.edges}
+    # readline named + libreadline.so provide deduped to one edge; ghost-pkg,
+    # zsh, and bash-legacy dropped as unresolvable; glibc's `sh` dep resolves
+    # to bash via its provide; optdepends and conflicts get their own types
+    assert edges == {
+        ("bash", "readline", "depends_on", "hard"),
+        ("bash", "glibc", "depends_on", "hard"),
+        ("glibc", "bash", "depends_on", "hard"),
+        ("glibc", "readline", "depends_on", "optional"),
+        ("bash", "glibc", "conflicts_with", "conflicts"),
+    }
 
 
 def test_build_payload_first_repo_wins_on_duplicates(core_db):

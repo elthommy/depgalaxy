@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { DYNAMIC_EDGE, MUTED, PACK_ACCENT, STATIC_EDGE, kindColor, withAlpha } from "../palette";
+import { DYNAMIC_EDGE, LINK_STYLES, MUTED, PACK_ACCENT, kindColor, withAlpha } from "../palette";
 import { useGalaxyStore } from "../store";
 
 const FULL_DEPTH = 6; // slider max = "full graph" (no depth limit)
@@ -19,6 +19,16 @@ export default function LegendPanel() {
       if (!n.is_pack) seen.add(n.kind);
     }
     return [...seen].sort().slice(0, 6);
+  }, [view]);
+
+  // link types present in the current view, in LINK_STYLES declaration order
+  const linkTypes = useMemo(() => {
+    const seen = new Set<string>();
+    for (const e of view?.edges ?? []) {
+      const t = e.attrs.link_type;
+      if (typeof t === "string") seen.add(t);
+    }
+    return Object.keys(LINK_STYLES).filter((t) => seen.has(t));
   }, [view]);
 
   const rootLabel = useMemo(
@@ -76,31 +86,28 @@ export default function LegendPanel() {
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div className="section-title">Edges · depends_on</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span
-              style={{
-                width: 26,
-                borderTop: `2px solid ${DYNAMIC_EDGE}`,
-                boxShadow: `0 0 6px ${withAlpha(DYNAMIC_EDGE, 0.7)}`,
-              }}
-            />
-            dynamic link
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span
-              style={{
-                width: 26,
-                borderTop: `2px dashed ${STATIC_EDGE}`,
-                boxShadow: `0 0 6px ${withAlpha(STATIC_EDGE, 0.5)}`,
-              }}
-            />
-            static link
+      {linkTypes.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="section-title">Edges</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 12 }}>
+            {linkTypes.map((t) => {
+              const style = LINK_STYLES[t];
+              return (
+                <div key={t} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span
+                    style={{
+                      width: 26,
+                      borderTop: `2px ${style.dashed ? "dashed" : "solid"} ${style.color}`,
+                      boxShadow: `0 0 6px ${withAlpha(style.color, style.dashed ? 0.5 : 0.7)}`,
+                    }}
+                  />
+                  {style.label}
+                </div>
+              );
+            })}
           </div>
         </div>
-      </div>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <div className="section-title">Packs</div>

@@ -4,7 +4,7 @@ import type { ForceGraphMethods, LinkObject, NodeObject } from "react-force-grap
 import * as THREE from "three";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import SpriteText from "three-spritetext";
-import { DYNAMIC_EDGE, STATIC_EDGE, kindColor } from "./palette";
+import { LINK_STYLES, kindColor } from "./palette";
 import { useGalaxyStore } from "./store";
 import type { GraphView, ViewEdge, ViewNode } from "./types";
 
@@ -18,19 +18,25 @@ export type GNode = NodeObject<NodeData>;
 export type GLink = LinkObject<NodeData, ViewEdge>;
 export type FGMethods = ForceGraphMethods<GNode, GLink>;
 
-// Shared link materials: dynamic = solid cyan, static = dashed amber.
-const dynamicLinkMaterial = new THREE.LineBasicMaterial({
-  color: new THREE.Color(DYNAMIC_EDGE),
-  transparent: true,
-  opacity: 0.45,
-});
-const staticLinkMaterial = new THREE.LineDashedMaterial({
-  color: new THREE.Color(STATIC_EDGE),
-  transparent: true,
-  opacity: 0.6,
-  dashSize: 2,
-  gapSize: 1.5,
-});
+// One shared material per declared link_type (LINK_STYLES), plus a fallback.
+const linkMaterials = new Map<string, THREE.Material>(
+  Object.entries(LINK_STYLES).map(([type, style]) => [
+    type,
+    style.dashed
+      ? new THREE.LineDashedMaterial({
+          color: new THREE.Color(style.color),
+          transparent: true,
+          opacity: 0.6,
+          dashSize: 2,
+          gapSize: 1.5,
+        })
+      : new THREE.LineBasicMaterial({
+          color: new THREE.Color(style.color),
+          transparent: true,
+          opacity: 0.45,
+        }),
+  ]),
+);
 const defaultLinkMaterial = new THREE.LineBasicMaterial({
   color: 0x64748b,
   transparent: true,
@@ -38,14 +44,8 @@ const defaultLinkMaterial = new THREE.LineBasicMaterial({
 });
 
 function linkMaterial(link: GLink): THREE.Material {
-  switch (link.attrs?.link_type) {
-    case "dynamic":
-      return dynamicLinkMaterial;
-    case "static":
-      return staticLinkMaterial;
-    default:
-      return defaultLinkMaterial;
-  }
+  const type = link.attrs?.link_type;
+  return (typeof type === "string" && linkMaterials.get(type)) || defaultLinkMaterial;
 }
 
 /** Radial-gradient sprite texture used for pack glow halos. */

@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { fetchNode } from "../api";
 import {
   DYNAMIC_EDGE,
+  LINK_STYLES,
   MUTED,
   PACK_ACCENT,
   PACK_ACCENT_LIGHT,
-  STATIC_EDGE,
   TEXT,
   kindColor,
   withAlpha,
@@ -55,38 +55,45 @@ function StatTile({
   );
 }
 
-/** Cyan/amber split bar for the link_type breakdown. */
+/** Proportional split bar over the link_type breakdown, styled per LINK_STYLES. */
 function LinkTypeBar({ title, counts }: { title: string; counts: Record<string, number> }) {
-  const dynamic = counts.dynamic ?? 0;
-  const static_ = counts.static ?? 0;
-  const total = dynamic + static_;
+  const entries = Object.keys(LINK_STYLES)
+    .filter((t) => (counts[t] ?? 0) > 0)
+    .map((t) => ({ type: t, style: LINK_STYLES[t], count: counts[t] }));
+  const total = entries.reduce((sum, e) => sum + e.count, 0);
   if (total === 0) return null;
-  const dynPct = Math.round((dynamic / total) * 100);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div className="section-title">{title}</div>
       <div style={{ display: "flex", height: 6, borderRadius: 3, overflow: "hidden", gap: 2 }}>
-        <div
-          style={{
-            width: `${dynPct}%`,
-            background: DYNAMIC_EDGE,
-            boxShadow: `0 0 8px ${withAlpha(DYNAMIC_EDGE, 0.6)}`,
-          }}
-        />
-        <div
-          style={{
-            width: `${100 - dynPct}%`,
-            background: `repeating-linear-gradient(90deg, ${STATIC_EDGE} 0 5px, transparent 5px 9px)`,
-          }}
-        />
+        {entries.map(({ type, style, count }) => (
+          <div
+            key={type}
+            style={{
+              width: `${(count / total) * 100}%`,
+              background: style.dashed
+                ? `repeating-linear-gradient(90deg, ${style.color} 0 5px, transparent 5px 9px)`
+                : style.color,
+              boxShadow: style.dashed ? "none" : `0 0 8px ${withAlpha(style.color, 0.6)}`,
+            }}
+          />
+        ))}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: MUTED }}>
-        <span>
-          <span style={{ color: DYNAMIC_EDGE }}>●</span> dynamic · {dynamic}
-        </span>
-        <span>
-          <span style={{ color: STATIC_EDGE }}>◌</span> static · {static_}
-        </span>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "4px 14px",
+          fontSize: 11,
+          color: MUTED,
+        }}
+      >
+        {entries.map(({ type, style, count }) => (
+          <span key={type}>
+            <span style={{ color: style.color }}>{style.dashed ? "◌" : "●"}</span>{" "}
+            {style.label.split(" ")[0]} · {count}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -95,6 +102,7 @@ function LinkTypeBar({ title, counts }: { title: string; counts: Record<string, 
 function DepRow({ dep, edgeStub }: { dep: DepRef; edgeStub: boolean }) {
   const focusNode = useGalaxyStore((s) => s.focusNode);
   const color = kindColor(dep.kind);
+  const linkStyle = dep.link_type !== null ? LINK_STYLES[dep.link_type] : undefined;
   return (
     <div
       className="hover-row"
@@ -105,18 +113,12 @@ function DepRow({ dep, edgeStub }: { dep: DepRef; edgeStub: boolean }) {
         <span
           style={{
             width: 20,
-            borderTop:
-              dep.link_type === "static"
-                ? `2px dashed ${STATIC_EDGE}`
-                : dep.link_type === "dynamic"
-                  ? `2px solid ${DYNAMIC_EDGE}`
-                  : "2px solid rgba(148,163,205,0.4)",
-            boxShadow:
-              dep.link_type === "static"
-                ? `0 0 6px ${withAlpha(STATIC_EDGE, 0.5)}`
-                : dep.link_type === "dynamic"
-                  ? `0 0 6px ${withAlpha(DYNAMIC_EDGE, 0.7)}`
-                  : "none",
+            borderTop: linkStyle
+              ? `2px ${linkStyle.dashed ? "dashed" : "solid"} ${linkStyle.color}`
+              : "2px solid rgba(148,163,205,0.4)",
+            boxShadow: linkStyle
+              ? `0 0 6px ${withAlpha(linkStyle.color, linkStyle.dashed ? 0.5 : 0.7)}`
+              : "none",
             flex: "none",
           }}
         />
@@ -242,6 +244,17 @@ export default function DetailPanel() {
   const isCollapsed = collapsed.includes(details.id);
   const isRoot = root === details.id;
   const version = typeof details.attrs.version === "string" ? details.attrs.version : null;
+
+  // conflicts are not dependencies — pull them into their own list
+  const deps = details.deps.filter((d) => d.link_type !== "conflicts");
+  const reverseDeps = details.reverse_deps.filter((d) => d.link_type !== "conflicts");
+  const conflicts = [
+    ...new Map(
+      [...details.deps, ...details.reverse_deps]
+        .filter((d) => d.link_type === "conflicts")
+        .map((d) => [d.id, d]),
+    ).values(),
+  ];
 
   return (
     <div
@@ -371,8 +384,8 @@ export default function DetailPanel() {
             </>
           ) : (
             <>
-              <StatTile value={details.reverse_deps.length} label="DEPENDENTS" color={DYNAMIC_EDGE} />
-              <StatTile value={details.deps.length} label="DEPS" />
+              <StatTile value={reverseDeps.length} label="DEPENDENTS" color={DYNAMIC_EDGE} />
+              <StatTile value={deps.length} label="DEPS" />
               <StatTile value={details.hops_deep ?? "—"} label="HOPS DEEP" />
             </>
           )}
@@ -390,8 +403,9 @@ export default function DetailPanel() {
             edgeStub={false}
           />
         )}
-        <DepList title="Direct dependencies" deps={details.deps} edgeStub={true} />
-        <DepList title="Reverse dependencies" deps={details.reverse_deps} edgeStub={false} />
+        <DepList title="Direct dependencies" deps={deps} edgeStub={true} />
+        <DepList title="Reverse dependencies" deps={reverseDeps} edgeStub={false} />
+        <DepList title="Conflicts" deps={conflicts} edgeStub={true} />
 
         {isPack && (
           <div style={{ display: "flex", gap: 8 }}>

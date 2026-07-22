@@ -17,6 +17,11 @@ class GraphValidationError(ValueError):
     """Raised when a payload or view request violates a graph invariant."""
 
 
+# the only relation traversed by depth slicing / hops computations;
+# other relations (e.g. conflicts_with) are displayed but never followed
+DEP_RELATION = "depends_on"
+
+
 @dataclass(frozen=True)
 class DepGraph:
     """A validated, immutable in-memory dependency graph."""
@@ -217,18 +222,23 @@ def _common_attrs(edges: list[Edge]) -> dict:
 
 
 def _top_level(visible: set[str], edges: list[ViewEdge]) -> set[str]:
-    """Return the visible nodes with no incoming view edge (the view's top level)."""
-    targets = {edge.target for edge in edges}
+    """Return the visible nodes with no incoming dependency edge (the view's top level)."""
+    targets = {edge.target for edge in edges if edge.relation == DEP_RELATION}
     return {nid for nid in visible if nid not in targets}
 
 
 def _slice_depth(
     edges: list[ViewEdge], roots: set[str], depth: int | None
 ) -> tuple[set[str], list[ViewEdge]]:
-    """Keep only nodes within `depth` dependency hops of `roots` (all hops if depth is None)."""
+    """Keep only nodes within `depth` dependency hops of `roots` (all hops if depth is None).
+
+    Only dependency edges are traversed; edges of other relations are kept
+    when both endpoints survive the slice.
+    """
     adjacency: dict[str, list[str]] = {}
     for edge in edges:
-        adjacency.setdefault(edge.source, []).append(edge.target)
+        if edge.relation == DEP_RELATION:
+            adjacency.setdefault(edge.source, []).append(edge.target)
     kept = set(roots)
     frontier = list(roots)
     level = 0
@@ -290,11 +300,15 @@ def node_details(graph: DepGraph, node_id: str) -> NodeDetails:
 
 
 def _hops_deep(graph: DepGraph, node_id: str) -> int | None:
-    """BFS distance of a node from the in-degree-0 top level; None if unreachable (cycles)."""
-    targets = {edge.target for edge in graph.edges}
+    """BFS distance of a node from the in-degree-0 top level; None if unreachable (cycles).
+
+    Only dependency edges count for both the in-degree and the traversal.
+    """
+    dep_edges = [edge for edge in graph.edges if edge.relation == DEP_RELATION]
+    targets = {edge.target for edge in dep_edges}
     dist = {nid: 0 for nid in graph.nodes if nid not in targets}
     adjacency: dict[str, list[str]] = {}
-    for edge in graph.edges:
+    for edge in dep_edges:
         adjacency.setdefault(edge.source, []).append(edge.target)
     frontier = list(dist)
     while frontier:

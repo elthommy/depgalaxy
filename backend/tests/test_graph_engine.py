@@ -323,3 +323,33 @@ def test_hops_deep_is_shortest_distance():
 def test_hops_deep_none_inside_pure_cycle():
     payload = make_payload(["a", "b"], edges=[("a", "b", {}), ("b", "a", {})])
     assert node_details(build_graph(payload), "a").hops_deep is None
+
+
+# --- non-dependency relations (e.g. conflicts_with) ---
+
+
+def conflict_graph():
+    """a depends on b; a conflicts with c; c depends on d."""
+    payload = make_payload(["a", "b", "c", "d"], edges=[("a", "b", {}), ("c", "d", {})])
+    payload.edges.append(Edge(source="a", target="c", relation="conflicts_with"))
+    return build_graph(payload)
+
+
+def test_slice_does_not_traverse_conflict_edges():
+    view = compute_view(conflict_graph(), root="a")
+    # c is only reachable through the conflict edge -> excluded from the subtree
+    assert view_ids(view) == {"a", "b"}
+
+
+def test_conflict_edges_kept_when_both_endpoints_visible():
+    view = compute_view(conflict_graph(), depth=1)
+    # a and c are both top level (conflicts_with does not count as incoming)
+    assert view_ids(view) == {"a", "b", "c", "d"}
+    relations = {(e.source, e.target): e.relation for e in view.edges}
+    assert relations[("a", "c")] == "conflicts_with"
+
+
+def test_hops_deep_ignores_conflict_edges():
+    graph = conflict_graph()
+    assert node_details(graph, "c").hops_deep == 0
+    assert node_details(graph, "d").hops_deep == 1
