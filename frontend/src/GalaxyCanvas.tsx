@@ -6,7 +6,9 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import SpriteText from "three-spritetext";
 import { DIM_NODE, LINK_STYLES, PATH_EDGE, kindColor } from "./palette";
 import { type LinkLayer, buildLinkLayer } from "./linkLayer";
+import { type NodeLayer, buildNodeLayer, nodeRadius, pickProxy } from "./nodeLayer";
 import { type PathHighlight, edgeKey, pathHighlight } from "./pathHighlight";
+import { createReframeTracker } from "./reframe";
 import { simulationSettings } from "./simulation";
 import { useGalaxyStore } from "./store";
 import type { GraphView, ViewEdge, ViewNode } from "./types";
@@ -113,6 +115,11 @@ function packObject(node: GNode, colorHex: string): THREE.Object3D {
   group.add(sphere);
   group.add(halo);
   return group;
+}
+
+/** Node size value: grows with fan-in (capped), as fed to react-force-graph. */
+function nodeVal(node: GNode): number {
+  return 1 + Math.min(node.fanIn, 50) * 0.8;
 }
 
 // muted so the bloom pass doesn't turn labels into glare
@@ -246,16 +253,35 @@ export default function GalaxyCanvas({
     [pathFrom, pickPathTarget, togglePack, select],
   );
 
-  // Frame the whole path once per search (not on refetches after a collapse).
+  // Frame the whole path once per search (not on refetches after a collapse),
+  // and once more when the layout settles if it was still moving (large
+  // graphs settle on screen), unless the user has moved the camera since.
   const framedPath = useRef<string | null>(null);
+  const reframe = useRef(createReframeTracker());
+  const layoutMoving = useRef(false);
+  useEffect(() => {
+    layoutMoving.current = true; // a new graph restarts the layout
+  }, [graphData]);
+  useEffect(() => {
+    type Controls = THREE.EventDispatcher<{ start: object }>;
+    const controls = fgRef.current?.controls() as Controls | undefined;
+    if (!controls) return;
+    const onUserMove = () => reframe.current.userMoved();
+    controls.addEventListener("start", onUserMove);
+    return () => controls.removeEventListener("start", onUserMove);
+  }, [fgRef]);
   useEffect(() => {
     const fg = fgRef.current;
-    if (!path) framedPath.current = null;
+    if (!path) {
+      framedPath.current = null;
+      reframe.current.reset();
+    }
     if (!fg || !path || !highlight) return;
     const key = edgeKey(path.source, path.target);
     if (framedPath.current === key) return;
     framedPath.current = key;
     frameNodes(fg, graphData.nodes.filter((n) => highlight.nodes.has(n.id)));
+    reframe.current.framed(layoutMoving.current);
   }, [fgRef, path, highlight, graphData]);
 
   // while a path is shown, nodes off the path dim
@@ -272,11 +298,35 @@ export default function GalaxyCanvas({
         if (showLabels) obj.add(makeLabel(node));
         return obj;
       }
-      // returning a falsy value means "use the default sphere"; the typings don't admit it
-      return showLabels ? makeLabel(node) : (undefined as unknown as THREE.Object3D);
+      // plain nodes are drawn by the batched node layer; the library only
+      // holds an invisible hit target (hover, click, drag) plus the label
+      const obj = new THREE.Group();
+      obj.add(pickProxy(nodeRadius(nodeVal(node))));
+      if (showLabels) obj.add(makeLabel(node));
+      return obj;
     },
     [showLabels, nodeColor],
   );
+
+  // Plain nodes: one InstancedMesh (one draw call) instead of a mesh per node.
+  const nodeLayer = useRef<NodeLayer | null>(null);
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const layer = buildNodeLayer(
+      graphData.nodes.filter((n) => !n.is_pack),
+      (n) => nodeRadius(nodeVal(n)),
+      nodeColor,
+    );
+    layer.update();
+    fg.scene().add(layer.object);
+    nodeLayer.current = layer;
+    return () => {
+      fg.scene().remove(layer.object);
+      layer.dispose();
+      nodeLayer.current = null;
+    };
+  }, [fgRef, graphData, nodeColor]);
 
   // Links are drawn by our batched layer (one draw call per material);
   // react-force-graph only draws the few path links, which need its
@@ -299,7 +349,21 @@ export default function GalaxyCanvas({
       linkLayer.current = null;
     };
   }, [fgRef, graphData, highlight]);
-  const updateLinkLayer = useCallback(() => linkLayer.current?.update(), []);
+  const updateLayers = useCallback(() => {
+    linkLayer.current?.update();
+    nodeLayer.current?.update();
+  }, []);
+  const onEngineTick = useCallback(() => {
+    layoutMoving.current = true;
+    updateLayers();
+  }, [updateLayers]);
+  const onEngineStop = useCallback(() => {
+    layoutMoving.current = false;
+    const fg = fgRef.current;
+    if (fg && highlight && reframe.current.layoutSettled()) {
+      frameNodes(fg, graphData.nodes.filter((n) => highlight.nodes.has(n.id)));
+    }
+  }, [fgRef, graphData, highlight]);
 
   const linkVisible = useCallback(
     (link: GLink) => highlight !== null && isPathLink(link, highlight),
@@ -320,12 +384,10 @@ export default function GalaxyCanvas({
         graphData={graphData}
         backgroundColor={BACKGROUND}
         nodeLabel={(node) => `${node.label} · ${node.kind}${node.is_pack ? " (pack)" : ""}`}
-        nodeColor={nodeColor}
-        nodeVal={(node) => 1 + Math.min(node.fanIn, 50) * 0.8}
+        nodeVal={nodeVal}
         nodeThreeObject={nodeThreeObject}
-        // packs replace the default object; plain nodes keep their sphere under the label
-        nodeThreeObjectExtend={(node) => !node.is_pack}
-        nodeOpacity={0.85}
+        // every node gets a custom object: pack orbs, or hit proxies for batched nodes
+        nodeThreeObjectExtend={false}
         linkVisibility={linkVisible}
         linkMaterial={pathLinkMaterialFor}
         linkWidth={0}
@@ -336,9 +398,10 @@ export default function GalaxyCanvas({
         linkDirectionalParticleColor={() => PATH_EDGE}
         onNodeClick={onNodeClick}
         onBackgroundClick={() => (pathFrom !== null ? cancelPathPick() : select(null))}
-        onEngineTick={updateLinkLayer}
-        onNodeDrag={updateLinkLayer}
-        onNodeDragEnd={updateLinkLayer}
+        onEngineTick={onEngineTick}
+        onEngineStop={onEngineStop}
+        onNodeDrag={updateLayers}
+        onNodeDragEnd={updateLayers}
         warmupTicks={simulation.warmupTicks}
         cooldownTime={simulation.cooldownTime}
         d3AlphaDecay={simulation.d3AlphaDecay}
