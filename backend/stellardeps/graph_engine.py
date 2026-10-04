@@ -6,6 +6,7 @@ nothing about FastAPI or HTTP.
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Literal
 
 import networkx as nx
 from pydantic import BaseModel, Field
@@ -20,6 +21,9 @@ class GraphValidationError(ValueError):
 # the only relation traversed by depth slicing / hops computations;
 # other relations (e.g. conflicts_with) are displayed but never followed
 DEP_RELATION = "depends_on"
+
+# at most this many shortest paths are listed in a PathResult
+MAX_LISTED_PATHS = 10
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,34 @@ class NodeDetails(BaseModel):
     edges_out: int = 0
     edge_attrs: dict[str, dict[str, int]] = Field(default_factory=dict)
     hops_deep: int | None = None
+
+
+class PathEdge(BaseModel):
+    """A highlighted dependency edge between two visible view nodes."""
+
+    source: str
+    target: str
+
+
+class PathResult(BaseModel):
+    """The shortest dependency paths between two nodes, returned by GET /path.
+
+    Paths always run in dependency order (each node depends on the next):
+    from source to target when `direction` is "forward", from target to
+    source when it is "reverse". `direction` is None when no path exists.
+    `highlight_nodes` / `highlight_edges` cover every shortest path, mapped
+    onto the visible representatives for the requested collapsed packs.
+    """
+
+    source: str
+    target: str
+    direction: Literal["forward", "reverse"] | None = None
+    hops: int | None = None
+    path_count: int = 0
+    paths: list[list[NodeRef]] = Field(default_factory=list)
+    truncated: bool = False
+    highlight_nodes: list[str] = Field(default_factory=list)
+    highlight_edges: list[PathEdge] = Field(default_factory=list)
 
 
 def build_graph(payload: GraphPayload) -> DepGraph:
@@ -364,3 +396,169 @@ def _attr_breakdown(edges: list[Edge]) -> dict[str, dict[str, int]]:
             bucket = breakdown.setdefault(key, {})
             bucket[str(value)] = bucket.get(str(value), 0) + 1
     return breakdown
+
+
+# --- shortest dependency paths ---
+
+
+@dataclass(frozen=True)
+class _PathDag:
+    """Every node and edge lying on at least one shortest path.
+
+    `layer` maps each such node to its distance from the start set; layer 0
+    holds the path starts and layer `hops` the path ends.
+    """
+
+    hops: int
+    layer: dict[str, int]
+    edges: frozenset[tuple[str, str]]
+
+
+def shortest_paths(
+    graph: DepGraph, source: str, target: str, collapsed: Iterable[str] = ()
+) -> PathResult:
+    """Find all shortest dependency paths between two nodes (or packs).
+
+    Dependency edges are followed from source to target first; if none
+    exists, from target to source ("reverse"). A pack endpoint stands for
+    itself and all of its transitive members. Highlights are mapped onto
+    the visible representatives for `collapsed`.
+    """
+    collapsed_set = frozenset(collapsed)
+    _check_path_params(graph, source, target, collapsed_set)
+    sources, targets = _scope(graph, source), _scope(graph, target)
+    succ = _dep_successors(graph)
+    direction: Literal["forward", "reverse"] = "forward"
+    dag = _path_dag(succ, sources, targets)
+    if dag is None:
+        direction = "reverse"
+        dag = _path_dag(succ, targets, sources)
+    if dag is None:
+        return PathResult(source=source, target=target)
+    return _path_result(graph, source, target, direction, dag, collapsed_set)
+
+
+def _check_path_params(
+    graph: DepGraph, source: str, target: str, collapsed: frozenset[str]
+) -> None:
+    """Reject unknown endpoints, invalid collapsed packs, and overlapping endpoints."""
+    for endpoint in (source, target):
+        if endpoint not in graph.nodes:
+            raise GraphValidationError(f"unknown node: {endpoint!r}")
+    _check_view_params(graph, collapsed, depth=None, root=None)
+    if _scope(graph, source) & _scope(graph, target):
+        raise GraphValidationError(
+            f"source and target overlap (same node or one contains the other): "
+            f"{source!r}, {target!r}"
+        )
+
+
+def _scope(graph: DepGraph, node_id: str) -> set[str]:
+    """Return the node itself plus, for a pack, all of its transitive members."""
+    return {node_id} | _descendants(graph, node_id)
+
+
+def _dep_successors(graph: DepGraph) -> dict[str, set[str]]:
+    """Index dependency edges as node -> set of direct dependencies."""
+    succ: dict[str, set[str]] = {}
+    for edge in graph.edges:
+        if edge.relation == DEP_RELATION:
+            succ.setdefault(edge.source, set()).add(edge.target)
+    return succ
+
+
+def _bfs(adjacency: dict[str, set[str]], starts: set[str]) -> dict[str, int]:
+    """Multi-source BFS: hop distance from the nearest start for every reachable node."""
+    dist = dict.fromkeys(starts, 0)
+    frontier = list(starts)
+    while frontier:
+        next_frontier = []
+        for node in frontier:
+            for nxt in adjacency.get(node, ()):
+                if nxt not in dist:
+                    dist[nxt] = dist[node] + 1
+                    next_frontier.append(nxt)
+        frontier = next_frontier
+    return dist
+
+
+def _path_dag(succ: dict[str, set[str]], starts: set[str], ends: set[str]) -> _PathDag | None:
+    """Return the union of all shortest start -> end paths, or None if no end is reachable.
+
+    A node lies on a shortest path iff its distance from the starts plus its
+    distance to the ends equals the shortest length.
+    """
+    from_starts = _bfs(succ, starts)
+    reached = [from_starts[n] for n in ends if n in from_starts]
+    if not reached:
+        return None
+    hops = min(reached)
+    pred: dict[str, set[str]] = {}
+    for node, targets in succ.items():
+        for nxt in targets:
+            pred.setdefault(nxt, set()).add(node)
+    to_ends = _bfs(pred, ends)
+    layer = {n: d for n, d in from_starts.items() if n in to_ends and d + to_ends[n] == hops}
+    edges = frozenset(
+        (u, v) for u in layer for v in succ.get(u, ()) if layer.get(v) == layer[u] + 1
+    )
+    return _PathDag(hops=hops, layer=layer, edges=edges)
+
+
+def _count_paths(dag: _PathDag) -> int:
+    """Count the distinct shortest paths in the DAG, layer by layer."""
+    preds: dict[str, list[str]] = {}
+    for u, v in dag.edges:
+        preds.setdefault(v, []).append(u)
+    counts: dict[str, int] = {}
+    for node in sorted(dag.layer, key=dag.layer.__getitem__):
+        counts[node] = 1 if dag.layer[node] == 0 else sum(counts[p] for p in preds[node])
+    return sum(counts[n] for n, d in dag.layer.items() if d == dag.hops)
+
+
+def _list_paths(dag: _PathDag, limit: int) -> list[list[str]]:
+    """List up to `limit` shortest paths, in sorted (deterministic) order."""
+    succ: dict[str, list[str]] = {}
+    for u, v in sorted(dag.edges):
+        succ.setdefault(u, []).append(v)
+    paths: list[list[str]] = []
+
+    def walk(path: list[str]) -> None:
+        """Extend `path` depth-first until it reaches an end or the limit is hit."""
+        if len(paths) >= limit:
+            return
+        if dag.layer[path[-1]] == dag.hops:
+            paths.append(path)
+            return
+        for nxt in succ.get(path[-1], ()):
+            walk([*path, nxt])
+
+    for start in sorted(n for n, d in dag.layer.items() if d == 0):
+        walk([start])
+    return paths
+
+
+def _path_result(
+    graph: DepGraph,
+    source: str,
+    target: str,
+    direction: Literal["forward", "reverse"],
+    dag: _PathDag,
+    collapsed: frozenset[str],
+) -> PathResult:
+    """Assemble a PathResult, mapping highlights onto visible representatives."""
+    path_count = _count_paths(dag)
+    listed = _list_paths(dag, MAX_LISTED_PATHS)
+    rep = {n: _representative(graph, n, collapsed) for n in dag.layer}
+    highlight_edges = sorted({(rep[u], rep[v]) for u, v in dag.edges if rep[u] != rep[v]})
+    return PathResult(
+        source=source,
+        target=target,
+        direction=direction,
+        hops=dag.hops,
+        path_count=path_count,
+        paths=[[_ref(graph, n) for n in path] for path in listed],
+        truncated=path_count > len(listed),
+        highlight_nodes=sorted(set(rep.values())),
+        highlight_edges=[PathEdge(source=s, target=t) for s, t in highlight_edges],
+    )

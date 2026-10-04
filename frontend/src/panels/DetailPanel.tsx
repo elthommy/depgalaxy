@@ -208,7 +208,7 @@ function ActionButton({
   );
 }
 
-/** Right: detail panel fed by /node/{id}, Node and Pack variants. */
+/** Right column: detail panel fed by /node/{id}, Node and Pack variants. */
 export default function DetailPanel() {
   const selectedId = useGalaxyStore((s) => s.selectedId);
   const select = useGalaxyStore((s) => s.select);
@@ -217,6 +217,9 @@ export default function DetailPanel() {
   const togglePack = useGalaxyStore((s) => s.togglePack);
   const root = useGalaxyStore((s) => s.root);
   const setRoot = useGalaxyStore((s) => s.setRoot);
+  const pathFrom = useGalaxyStore((s) => s.pathFrom);
+  const startPathPick = useGalaxyStore((s) => s.startPathPick);
+  const cancelPathPick = useGalaxyStore((s) => s.cancelPathPick);
   const [details, setDetails] = useState<NodeDetails | null>(null);
 
   useEffect(() => {
@@ -243,6 +246,7 @@ export default function DetailPanel() {
   const accent = isPack ? PACK_ACCENT : kindColor(details.kind);
   const isCollapsed = collapsed.includes(details.id);
   const isRoot = root === details.id;
+  const isPicking = pathFrom === details.id;
   const version = typeof details.attrs.version === "string" ? details.attrs.version : null;
 
   // conflicts are not dependencies — pull them into their own list
@@ -260,17 +264,13 @@ export default function DetailPanel() {
     <div
       className="glass"
       style={{
-        position: "absolute",
-        top: 20,
-        right: 20,
-        width: 326,
-        maxHeight: "calc(100vh - 260px)",
+        // shrinks inside the right column so its body scrolls
+        minHeight: 0,
         display: "flex",
         flexDirection: "column",
         borderRadius: 16,
         backdropFilter: "blur(18px)",
         WebkitBackdropFilter: "blur(18px)",
-        zIndex: 10,
         overflow: "hidden",
       }}
     >
@@ -421,6 +421,13 @@ export default function DetailPanel() {
             />
           </div>
         )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <ActionButton
+            label={isPicking ? "Cancel path search" : "Path to…"}
+            accent={false}
+            onClick={() => (isPicking ? cancelPathPick() : startPathPick(details.id))}
+          />
+        </div>
       </div>
     </div>
   );

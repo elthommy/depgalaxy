@@ -1,5 +1,13 @@
 import { useMemo } from "react";
-import { DYNAMIC_EDGE, LINK_STYLES, MUTED, PACK_ACCENT, kindColor, withAlpha } from "../palette";
+import {
+  DYNAMIC_EDGE,
+  LINK_STYLES,
+  MUTED,
+  PACK_ACCENT,
+  PATH_EDGE,
+  kindColor,
+  withAlpha,
+} from "../palette";
 import { useGalaxyStore } from "../store";
 
 const FULL_DEPTH = 6; // slider max = "full graph" (no depth limit)
@@ -12,6 +20,7 @@ export default function LegendPanel() {
   const root = useGalaxyStore((s) => s.root);
   const setRoot = useGalaxyStore((s) => s.setRoot);
   const selectedId = useGalaxyStore((s) => s.selectedId);
+  const showsPath = useGalaxyStore((s) => s.path !== null && s.path.direction !== null);
 
   const kinds = useMemo(() => {
     const seen = new Set<string>();
@@ -86,7 +95,7 @@ export default function LegendPanel() {
         </div>
       </div>
 
-      {linkTypes.length > 0 && (
+      {(linkTypes.length > 0 || showsPath) && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div className="section-title">Edges</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 12 }}>
@@ -105,6 +114,18 @@ export default function LegendPanel() {
                 </div>
               );
             })}
+            {showsPath && (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span
+                  style={{
+                    width: 26,
+                    borderTop: `2px solid ${PATH_EDGE}`,
+                    boxShadow: `0 0 6px ${withAlpha(PATH_EDGE, 0.8)}`,
+                  }}
+                />
+                shortest path
+              </div>
+            )}
           </div>
         </div>
       )}

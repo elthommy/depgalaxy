@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GraphView } from "./types";
+import type { GraphView, PathResult } from "./types";
 
 interface GalaxyState {
   // view parameters (drive /graph refetches)
@@ -18,6 +18,12 @@ interface GalaxyState {
   // last fetched view (shared by canvas + panels)
   view: GraphView | null;
   viewError: string | null;
+  // path finder: `pathFrom` is set while the user picks a destination;
+  // `pathEnds` is the requested pair, `path` its last fetched result
+  pathFrom: string | null;
+  pathEnds: { source: string; target: string } | null;
+  path: PathResult | null;
+  pathError: string | null;
 
   togglePack: (id: string) => void;
   collapseAll: () => void;
@@ -31,7 +37,15 @@ interface GalaxyState {
   setView: (view: GraphView) => void;
   setViewError: (error: string | null) => void;
   loadNewGraph: () => void;
+  startPathPick: (from: string) => void;
+  cancelPathPick: () => void;
+  pickPathTarget: (to: string) => void;
+  clearPath: () => void;
+  setPath: (path: PathResult) => void;
+  setPathError: (error: string | null) => void;
 }
+
+const NO_PATH = { pathFrom: null, pathEnds: null, path: null, pathError: null };
 
 export const useGalaxyStore = create<GalaxyState>((set, get) => ({
   collapsed: [],
@@ -44,6 +58,7 @@ export const useGalaxyStore = create<GalaxyState>((set, get) => ({
   showLabels: false,
   view: null,
   viewError: null,
+  ...NO_PATH,
 
   togglePack: (id) =>
     set((state) => ({
@@ -77,5 +92,16 @@ export const useGalaxyStore = create<GalaxyState>((set, get) => ({
       selectedId: null,
       focus: null,
       graphEpoch: state.graphEpoch + 1,
+      ...NO_PATH,
     })),
+  startPathPick: (from) => set({ pathFrom: from }),
+  cancelPathPick: () => set({ pathFrom: null }),
+  pickPathTarget: (to) => {
+    const { pathFrom } = get();
+    if (pathFrom === null) return;
+    set({ ...NO_PATH, pathEnds: { source: pathFrom, target: to } });
+  },
+  clearPath: () => set(NO_PATH),
+  setPath: (path) => set({ path, pathError: null }),
+  setPathError: (error) => set({ pathError: error }),
 }));

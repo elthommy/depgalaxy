@@ -63,3 +63,24 @@ export interface ImportCounts {
   edges: number;
   packs: number;
 }
+
+export interface PathEdge {
+  source: string;
+  target: string;
+}
+
+/** Mirrors PathResult: all shortest dependency paths between two nodes. */
+export interface PathResult {
+  source: string;
+  target: string;
+  // paths run in dependency order: source -> target when "forward",
+  // target -> source when "reverse"; null when no path exists
+  direction: "forward" | "reverse" | null;
+  hops: number | null;
+  path_count: number;
+  paths: NodeRef[][];
+  truncated: boolean;
+  // mapped onto the visible view nodes for the requested collapsed packs
+  highlight_nodes: string[];
+  highlight_edges: PathEdge[];
+}

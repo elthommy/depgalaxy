@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchGraph, fetchNode, runFeed } from "./api";
+import { fetchGraph, fetchNode, fetchPath, runFeed } from "./api";
 
 function stubFetch(body: unknown, init: { status?: number } = {}) {
   const fetchMock = vi.fn().mockResolvedValue(
@@ -44,5 +44,23 @@ describe("ids in paths", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/feeds/pacman%2Fcore%20extra/run", {
       method: "POST",
     });
+  });
+});
+
+describe("fetchPath", () => {
+  it("sends both ends and the collapsed packs", async () => {
+    const fetchMock = stubFetch({});
+    await fetchPath("lib a", "z", ["p1", "p2"]);
+    const url = new URL(fetchMock.mock.calls[0][0], "http://x");
+    expect(url.pathname).toBe("/api/path");
+    expect(url.searchParams.get("from")).toBe("lib a");
+    expect(url.searchParams.get("to")).toBe("z");
+    expect(url.searchParams.get("collapsed")).toBe("p1,p2");
+  });
+
+  it("omits collapsed when no pack is collapsed", async () => {
+    const fetchMock = stubFetch({});
+    await fetchPath("a", "b", []);
+    expect(fetchMock).toHaveBeenCalledWith("/api/path?from=a&to=b", undefined);
   });
 });

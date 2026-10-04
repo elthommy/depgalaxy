@@ -15,6 +15,9 @@ export const PACK_ACCENT_LIGHT = "#f0abfc";
 export const DYNAMIC_EDGE = "#22d3ee";
 export const STATIC_EDGE = "#fbbf24";
 export const CONFLICT_EDGE = "#f87171";
+// path highlight: white glows hardest under bloom; everything else dims
+export const PATH_EDGE = "#ffffff";
+export const DIM_NODE = "#262c3d";
 export const TEXT = "#e6e9f2";
 export const MUTED = "#8b93a7";
 

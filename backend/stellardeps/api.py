@@ -4,11 +4,17 @@ The only server-side state is the currently imported graph (single-graph
 v1); every view is recomputed from it on each request.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 
 from stellardeps import feeds, graph_engine
 from stellardeps.feeds import FeedInfo, FeedUnavailableError
-from stellardeps.graph_engine import DepGraph, GraphValidationError, GraphView, NodeDetails
+from stellardeps.graph_engine import (
+    DepGraph,
+    GraphValidationError,
+    GraphView,
+    NodeDetails,
+    PathResult,
+)
 from stellardeps.models import GraphPayload
 
 app = FastAPI(title="Stellardeps", version="0.1.0")
@@ -82,3 +88,25 @@ def get_node(node_id: str) -> NodeDetails:
         return graph_engine.node_details(graph, node_id)
     except GraphValidationError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/path")
+def get_path(
+    source: str = Query(alias="from"),
+    target: str = Query(alias="to"),
+    collapsed: str = "",
+) -> PathResult:
+    """Return all shortest dependency paths between two nodes or packs.
+
+    `collapsed` (comma-separated pack ids) only affects the highlight
+    mapping. Unknown endpoints are 404; other invalid parameters are 400.
+    """
+    graph = _require_graph()
+    for node_id in (source, target):
+        if node_id not in graph.nodes:
+            raise HTTPException(status_code=404, detail=f"unknown node: {node_id!r}")
+    collapsed_ids = [pack_id for pack_id in collapsed.split(",") if pack_id]
+    try:
+        return graph_engine.shortest_paths(graph, source, target, collapsed_ids)
+    except GraphValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

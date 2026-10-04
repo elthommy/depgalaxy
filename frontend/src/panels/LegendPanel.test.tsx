@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useGalaxyStore } from "../store";
-import { sampleView } from "../test/fixtures";
+import { pathResult, sampleView } from "../test/fixtures";
 import LegendPanel from "./LegendPanel";
 
 describe("LegendPanel", () => {
@@ -27,5 +27,19 @@ describe("LegendPanel", () => {
 
     fireEvent.change(slider, { target: { value: "6" } });
     expect(useGalaxyStore.getState().depth).toBeNull();
+  });
+
+  it("adds a shortest-path entry only while a path is shown", () => {
+    useGalaxyStore.setState({ view: sampleView() });
+    const { rerender } = render(<LegendPanel />);
+    expect(screen.queryByText("shortest path")).not.toBeInTheDocument();
+
+    useGalaxyStore.setState({ path: { ...pathResult("a", "b"), direction: null } });
+    rerender(<LegendPanel />);
+    expect(screen.queryByText("shortest path")).not.toBeInTheDocument();
+
+    useGalaxyStore.setState({ path: pathResult("a", "b") });
+    rerender(<LegendPanel />);
+    expect(screen.getByText("shortest path")).toBeInTheDocument();
   });
 });

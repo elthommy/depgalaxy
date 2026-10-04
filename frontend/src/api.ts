@@ -1,4 +1,4 @@
-import type { FeedInfo, GraphView, ImportCounts, NodeDetails } from "./types";
+import type { FeedInfo, GraphView, ImportCounts, NodeDetails, PathResult } from "./types";
 
 export interface GraphParams {
   collapsed: string[];
@@ -25,6 +25,12 @@ export function fetchGraph({ collapsed, depth, root }: GraphParams): Promise<Gra
 
 export function fetchNode(id: string): Promise<NodeDetails> {
   return request(`/api/node/${encodeURIComponent(id)}`);
+}
+
+export function fetchPath(source: string, target: string, collapsed: string[]): Promise<PathResult> {
+  const qs = new URLSearchParams({ from: source, to: target });
+  if (collapsed.length > 0) qs.set("collapsed", collapsed.join(","));
+  return request(`/api/path?${qs}`);
 }
 
 export function fetchFeeds(): Promise<FeedInfo[]> {

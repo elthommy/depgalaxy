@@ -5,8 +5,8 @@ Explore arbitrary dependency graphs as an interactive 3D galaxy.
 Nodes are stars colored by kind, dependencies are glowing links, and
 groups of nodes ("packs") render as nebulae you can collapse into a
 single orb. Load a demo galaxy, the dynamic libraries of a binary, or the
-whole Arch Linux package graph, then search, filter by depth, and isolate
-subtrees.
+whole Arch Linux package graph, then search, filter by depth, isolate
+subtrees, and find the shortest dependency paths between two nodes.
 
 ## Features
 
@@ -20,6 +20,13 @@ subtrees.
 - **Selection panel** — node or pack details: stats (members, edges in/out,
   dependents, deps, HOPS DEEP), edge-type breakdown, direct and reverse
   dependencies, conflicts, and collapse/isolate actions.
+- **Path finder** — press **Path to…** on the selected node, then pick a
+  destination with the search box or by clicking a node in the galaxy
+  (`Esc` cancels). Every shortest dependency path lights up and the rest
+  of the galaxy dims; the **Path** card lists the hops (click one to fly
+  to it). If no path follows dependencies from source to destination, the
+  reverse direction is tried. Packs work as endpoints, collapsed packs
+  light up as orbs, and conflicts are never followed.
 - **Typed links** — edges carry a `link_type` styled by the legend:
   `dynamic` / `static` (ldd), `hard` / `optional` / `conflicts` (pacman).
   Conflicts are displayed but never followed by depth slicing.
@@ -70,6 +77,7 @@ The frontend proxies `/api/*` to the backend.
 | `POST /import` | Replace the graph with a `GraphPayload` (`nodes`, `edges`, `containment`) |
 | `GET /graph?collapsed=&depth=&root=` | Current view: collapsed packs (comma-separated), depth limit, slice root |
 | `GET /node/{id}` | Details of one node or pack |
+| `GET /path?from=&to=&collapsed=` | All shortest dependency paths between two nodes or packs (count, up to 10 listed, highlights mapped onto the collapsed view) |
 | `GET /feeds` | Registered feeds and their availability |
 | `POST /feeds/{id}/run` | Build a feed and import it |
 

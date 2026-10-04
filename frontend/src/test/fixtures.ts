@@ -1,4 +1,4 @@
-import type { GraphView, ViewEdge, ViewNode } from "../types";
+import type { GraphView, PathResult, ViewEdge, ViewNode } from "../types";
 
 /** Build a ViewNode with sensible defaults. */
 export function node(id: string, overrides: Partial<ViewNode> = {}): ViewNode {
@@ -36,5 +36,25 @@ export function sampleView(): GraphView {
       node("curl", { kind: "binary" }),
     ],
     edges: [edge("curl", "libssl", "dynamic"), edge("curl", "libz", "static")],
+  };
+}
+
+/** A one-hop forward PathResult from `source` to `target`. */
+export function pathResult(source: string, target: string): PathResult {
+  return {
+    source,
+    target,
+    direction: "forward",
+    hops: 1,
+    path_count: 1,
+    paths: [
+      [
+        { id: source, label: source, kind: "library" },
+        { id: target, label: target, kind: "library" },
+      ],
+    ],
+    truncated: false,
+    highlight_nodes: [source, target],
+    highlight_edges: [{ source, target }],
   };
 }

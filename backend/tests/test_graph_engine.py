@@ -5,6 +5,7 @@ from stellardeps.graph_engine import (
     build_graph,
     compute_view,
     node_details,
+    shortest_paths,
 )
 from stellardeps.models import Containment, Edge, GraphPayload, Node
 
@@ -353,3 +354,113 @@ def test_hops_deep_ignores_conflict_edges():
     graph = conflict_graph()
     assert node_details(graph, "c").hops_deep == 0
     assert node_details(graph, "d").hops_deep == 1
+
+
+# --- shortest dependency paths ---
+
+
+def chain_graph(*edges):
+    """Build a graph of plain nodes from (source, target) dependency pairs."""
+    node_ids = sorted({n for edge in edges for n in edge})
+    return build_graph(make_payload(node_ids, edges=[(s, t, {}) for s, t in edges]))
+
+
+def path_ids(result):
+    """Return the listed paths as lists of node ids."""
+    return [[ref.id for ref in path] for path in result.paths]
+
+
+def highlighted_edges(result):
+    """Return the highlighted edges as (source, target) tuples."""
+    return [(e.source, e.target) for e in result.highlight_edges]
+
+
+def test_path_forward():
+    result = shortest_paths(chain_graph(("a", "b"), ("b", "c")), "a", "c")
+    assert result.direction == "forward"
+    assert (result.hops, result.path_count, result.truncated) == (2, 1, False)
+    assert path_ids(result) == [["a", "b", "c"]]
+    assert result.paths[0][0].label == "A"
+    assert result.highlight_nodes == ["a", "b", "c"]
+    assert highlighted_edges(result) == [("a", "b"), ("b", "c")]
+
+
+def test_path_reverse_runs_in_dependency_order():
+    result = shortest_paths(chain_graph(("a", "b"), ("b", "c")), "c", "a")
+    assert result.direction == "reverse"
+    assert path_ids(result) == [["a", "b", "c"]]
+
+
+def test_no_path():
+    graph = build_graph(make_payload(["a", "b", "c"], edges=[("a", "b", {})]))
+    result = shortest_paths(graph, "a", "c")
+    assert (result.direction, result.hops, result.path_count) == (None, None, 0)
+    assert result.paths == [] and result.highlight_nodes == [] and result.highlight_edges == []
+
+
+def test_all_shortest_paths_exclude_longer_routes():
+    graph = chain_graph(
+        ("a", "b1"), ("a", "b2"), ("b1", "d"), ("b2", "d"), ("a", "x"), ("x", "y"), ("y", "d")
+    )
+    result = shortest_paths(graph, "a", "d")
+    assert (result.hops, result.path_count) == (2, 2)
+    assert path_ids(result) == [["a", "b1", "d"], ["a", "b2", "d"]]
+    assert result.highlight_nodes == ["a", "b1", "b2", "d"]
+
+
+def test_listed_paths_are_capped():
+    # a -> m0..m3 -> n0..n3 -> z: 4 * 4 = 16 shortest paths
+    mids, ends = [f"m{i}" for i in range(4)], [f"n{i}" for i in range(4)]
+    edges = [("a", m) for m in mids] + [(m, n) for m in mids for n in ends]
+    graph = chain_graph(*edges, *[(n, "z") for n in ends])
+    result = shortest_paths(graph, "a", "z")
+    assert (result.hops, result.path_count, result.truncated) == (3, 16, True)
+    assert len(result.paths) == 10
+    assert path_ids(result)[0] == ["a", "m0", "n0", "z"]
+    assert len(result.highlight_edges) == 4 + 16 + 4
+
+
+def test_path_does_not_follow_conflict_edges():
+    result = shortest_paths(conflict_graph(), "a", "c")
+    assert result.direction is None
+
+
+def test_path_through_cycle():
+    graph = chain_graph(("a", "b"), ("b", "c"), ("c", "a"))
+    assert shortest_paths(graph, "a", "c").hops == 2
+    assert shortest_paths(graph, "c", "a").hops == 1
+
+
+def test_pack_endpoint_stands_for_its_members(galaxy):
+    result = shortest_paths(galaxy, "app", "l2")
+    assert (result.direction, result.hops, result.path_count) == ("forward", 2, 2)
+    assert path_ids(result) == [["a1", "l1", "l2"], ["a2", "l1", "l2"]]
+
+
+def test_path_highlights_map_onto_collapsed_packs(galaxy):
+    result = shortest_paths(galaxy, "s1", "l3", collapsed=["lib"])
+    # listed paths keep the real nodes; highlights use the visible orb
+    assert path_ids(result) == [["s1", "a1", "l3"]]
+    assert result.highlight_nodes == ["a1", "lib", "s1"]
+    assert highlighted_edges(result) == [("a1", "lib"), ("s1", "a1")]
+
+
+def test_path_highlights_drop_edges_inside_one_orb(galaxy):
+    result = shortest_paths(galaxy, "s1", "a2", collapsed=["app"])
+    assert path_ids(result) == [["s1", "a1", "a2"]]
+    assert result.highlight_nodes == ["app", "s1"]
+    assert highlighted_edges(result) == [("s1", "app")]
+
+
+@pytest.mark.parametrize(
+    ("source", "target", "collapsed", "message"),
+    [
+        ("a1", "nope", [], "unknown node"),
+        ("a1", "a1", [], "overlap"),
+        ("lib", "l3", [], "overlap"),
+        ("a1", "l1", ["a2"], "not a pack"),
+    ],
+)
+def test_path_rejects_invalid_requests(galaxy, source, target, collapsed, message):
+    with pytest.raises(GraphValidationError, match=message):
+        shortest_paths(galaxy, source, target, collapsed=collapsed)

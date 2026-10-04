@@ -1,31 +1,51 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MUTED, PACK_ACCENT_LIGHT, TEXT, kindColor } from "../palette";
+import { DYNAMIC_EDGE, MUTED, PACK_ACCENT_LIGHT, TEXT, kindColor, withAlpha } from "../palette";
 import { useGalaxyStore } from "../store";
 
-/** Top-left: STELLARDEPS wordmark + search with client-side autocomplete. */
+/**
+ * Top-left: STELLARDEPS wordmark + search with client-side autocomplete.
+ * While a path search is in progress, picking a suggestion sets the path destination.
+ */
 export default function SearchPanel() {
   const view = useGalaxyStore((s) => s.view);
   const focusNode = useGalaxyStore((s) => s.focusNode);
+  const pathFrom = useGalaxyStore((s) => s.pathFrom);
+  const pickPathTarget = useGalaxyStore((s) => s.pickPathTarget);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // ⌘K / Ctrl-K focuses the search field
+  // ⌘K / Ctrl-K focuses the search field; Esc cancels a path search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         inputRef.current?.focus();
+      } else if (e.key === "Escape" && useGalaxyStore.getState().pathFrom !== null) {
+        useGalaxyStore.getState().cancelPathPick();
+        setQuery("");
+        inputRef.current?.blur();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // a path search starts with an empty, focused field
+  useEffect(() => {
+    if (pathFrom === null) return;
+    setQuery("");
+    inputRef.current?.focus();
+  }, [pathFrom]);
+
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!view || q === "") return [];
-    return view.nodes.filter((n) => n.label.toLowerCase().includes(q)).slice(0, 6);
-  }, [view, query]);
+    return view.nodes
+      .filter((n) => n.id !== pathFrom && n.label.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [view, query, pathFrom]);
+
+  const fromLabel = view?.nodes.find((n) => n.id === pathFrom)?.label ?? pathFrom;
 
   return (
     <div
@@ -50,7 +70,14 @@ export default function SearchPanel() {
           dependency galaxy
         </div>
       </div>
-      <div className="glass" style={{ borderRadius: 14, overflow: "hidden" }}>
+      <div
+        className="glass"
+        style={{
+          borderRadius: 14,
+          overflow: "hidden",
+          ...(pathFrom !== null && { borderColor: withAlpha(DYNAMIC_EDGE, 0.6) }),
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px" }}>
           <svg width="15" height="15" viewBox="0 0 15 15" style={{ flex: "none", opacity: 0.6 }}>
             <circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke={TEXT} strokeWidth="1.4" />
@@ -60,7 +87,9 @@ export default function SearchPanel() {
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search nodes, packs, services…"
+            placeholder={
+              pathFrom !== null ? `Path from ${fromLabel} to…` : "Search nodes, packs, services…"
+            }
             style={{
               flex: 1,
               background: "transparent",
@@ -86,6 +115,18 @@ export default function SearchPanel() {
             ⌘K
           </span>
         </div>
+        {pathFrom !== null && suggestions.length === 0 && (
+          <div
+            style={{
+              borderTop: "1px solid rgba(148,163,205,0.12)",
+              padding: "8px 14px",
+              fontSize: 11,
+              color: MUTED,
+            }}
+          >
+            search or click a node in the galaxy · Esc to cancel
+          </div>
+        )}
         {suggestions.length > 0 && (
           <div style={{ borderTop: "1px solid rgba(148,163,205,0.12)", padding: 6 }}>
             {suggestions.map((s) => {
@@ -95,7 +136,8 @@ export default function SearchPanel() {
                   key={s.id}
                   className="hover-row"
                   onClick={() => {
-                    focusNode(s.id);
+                    if (pathFrom !== null) pickPathTarget(s.id);
+                    else focusNode(s.id);
                     setQuery("");
                   }}
                   style={{

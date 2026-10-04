@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import * as api from "../api";
 import { useGalaxyStore } from "../store";
@@ -41,5 +42,17 @@ describe("DetailPanel", () => {
     expect(screen.getByText("Conflicts · 1")).toBeInTheDocument();
     expect(screen.getByText("HOPS DEEP").previousSibling).toHaveTextContent("3");
     expect(screen.getByText("DEPS").previousSibling).toHaveTextContent("1");
+  });
+
+  it("starts and cancels a path search from the selected node", async () => {
+    vi.spyOn(api, "fetchNode").mockResolvedValue(CURL);
+    useGalaxyStore.setState({ selectedId: "curl" });
+    render(<DetailPanel />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Path to…" }));
+    expect(useGalaxyStore.getState().pathFrom).toBe("curl");
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel path search" }));
+    expect(useGalaxyStore.getState().pathFrom).toBeNull();
   });
 });

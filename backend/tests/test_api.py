@@ -116,3 +116,56 @@ def test_node_pack_details():
 def test_node_unknown_is_404():
     import_payload()
     assert client.get("/node/ghost").status_code == 404
+
+
+def test_path_found():
+    import_payload()
+    response = client.get("/path", params={"from": "a1", "to": "x"})
+    assert response.status_code == 200
+    body = response.json()
+    assert (body["direction"], body["hops"], body["path_count"]) == ("forward", 1, 1)
+    assert [ref["id"] for ref in body["paths"][0]] == ["a1", "x"]
+    assert body["highlight_edges"] == [{"source": "a1", "target": "x"}]
+
+
+def test_path_reverse_and_collapsed_mapping():
+    import_payload()
+    response = client.get("/path", params={"from": "x", "to": "a2", "collapsed": "app"})
+    body = response.json()
+    assert (body["direction"], body["hops"]) == ("reverse", 1)
+    assert body["highlight_nodes"] == ["app", "x"]
+    assert body["highlight_edges"] == [{"source": "app", "target": "x"}]
+
+
+def test_path_none_found():
+    client.post("/import", json={"nodes": [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}]})
+    body = client.get("/path", params={"from": "a", "to": "b"}).json()
+    assert (body["direction"], body["path_count"], body["paths"]) == (None, 0, [])
+
+
+def test_path_before_import_is_404():
+    assert client.get("/path", params={"from": "a", "to": "b"}).status_code == 404
+
+
+def test_path_unknown_node_is_404():
+    import_payload()
+    response = client.get("/path", params={"from": "a1", "to": "nope"})
+    assert response.status_code == 404
+    assert "nope" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"from": "app", "to": "a1"},
+        {"from": "a1", "to": "x", "collapsed": "x"},
+    ],
+)
+def test_path_bad_params_are_400(params):
+    import_payload()
+    assert client.get("/path", params=params).status_code == 400
+
+
+def test_path_requires_both_endpoints():
+    import_payload()
+    assert client.get("/path", params={"from": "a1"}).status_code == 422
