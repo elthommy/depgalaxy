@@ -135,6 +135,29 @@ function PathBody({ path, label }: { path: PathResult; label: (id: string) => st
   );
 }
 
+/** "hard deps only" checkbox; offered while the galaxy has optional links (or it is on). */
+function HardDepsToggle() {
+  const hardDepsOnly = useGalaxyStore((s) => s.hardDepsOnly);
+  const setHardDepsOnly = useGalaxyStore((s) => s.setHardDepsOnly);
+  const hasOptional = useGalaxyStore(
+    (s) => s.view?.edges.some((e) => e.attrs.link_type === "optional") ?? false,
+  );
+  if (!hasOptional && !hardDepsOnly) return null;
+  return (
+    <label
+      style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: MUTED }}
+    >
+      <input
+        type="checkbox"
+        checked={hardDepsOnly}
+        onChange={(e) => setHardDepsOnly(e.target.checked)}
+        style={{ accentColor: DYNAMIC_EDGE, margin: 0 }}
+      />
+      hard deps only
+    </label>
+  );
+}
+
 /** Right column, above the Selection panel: result of the current path search. */
 export default function PathPanel() {
   const pathEnds = useGalaxyStore((s) => s.pathEnds);
@@ -175,6 +198,7 @@ export default function PathPanel() {
         {label(pathEnds.source)} <span style={{ color: DYNAMIC_EDGE }}>⇢</span>{" "}
         {label(pathEnds.target)}
       </div>
+      <HardDepsToggle />
       {pathError !== null ? (
         <div style={{ fontSize: 11, color: "#fca5a5" }}>{pathError}</div>
       ) : path === null ? (

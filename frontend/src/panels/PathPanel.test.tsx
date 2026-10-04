@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { useGalaxyStore } from "../store";
-import { node, pathResult, sampleView } from "../test/fixtures";
+import { edge, node, pathResult, sampleView } from "../test/fixtures";
 import type { NodeRef, PathResult } from "../types";
 import PathPanel from "./PathPanel";
 
@@ -113,5 +113,32 @@ describe("PathPanel", () => {
     await userEvent.click(screen.getByTitle("Clear path"));
     expect(useGalaxyStore.getState().pathEnds).toBeNull();
     expect(screen.queryByText("Path")).not.toBeInTheDocument();
+  });
+
+  describe("hard deps only", () => {
+    const optionalView = () => ({
+      nodes: [node("curl"), node("libz")],
+      edges: [edge("curl", "libz", "optional")],
+    });
+
+    it("is hidden when the galaxy has no optional links", () => {
+      showPath(pathResult("curl", "libz"));
+      expect(screen.queryByLabelText("hard deps only")).not.toBeInTheDocument();
+    });
+
+    it("is offered unticked when the galaxy has optional links", async () => {
+      showPath(pathResult("curl", "libz"), { view: optionalView() });
+      const box = screen.getByLabelText("hard deps only");
+      expect(box).not.toBeChecked();
+
+      await userEvent.click(box);
+      expect(useGalaxyStore.getState().hardDepsOnly).toBe(true);
+      expect(screen.getByText("searching…")).toBeInTheDocument();
+    });
+
+    it("stays visible while ticked so it can be unticked", () => {
+      showPath(pathResult("curl", "libz"), { hardDepsOnly: true });
+      expect(screen.getByLabelText("hard deps only")).toBeChecked();
+    });
   });
 });

@@ -169,3 +169,20 @@ def test_path_bad_params_are_400(params):
 def test_path_requires_both_endpoints():
     import_payload()
     assert client.get("/path", params={"from": "a1"}).status_code == 422
+
+
+def test_path_exclude_link_types():
+    client.post(
+        "/import",
+        json={
+            "nodes": [{"id": n, "label": n} for n in ("a", "b", "c")],
+            "edges": [
+                {"source": "a", "target": "c", "attrs": {"link_type": "optional"}},
+                {"source": "a", "target": "b", "attrs": {"link_type": "hard"}},
+                {"source": "b", "target": "c", "attrs": {"link_type": "hard"}},
+            ],
+        },
+    )
+    params = {"from": "a", "to": "c"}
+    assert client.get("/path", params=params).json()["hops"] == 1
+    assert client.get("/path", params={**params, "exclude": "optional"}).json()["hops"] == 2

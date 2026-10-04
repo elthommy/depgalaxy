@@ -72,6 +72,22 @@ describe("galaxy store", () => {
     expect(store().pathError).toBeNull();
   });
 
+  it("hard deps only is off by default and survives a new pick", () => {
+    expect(store().hardDepsOnly).toBe(false);
+    store().setHardDepsOnly(true);
+    store().startPathPick("a");
+    store().pickPathTarget("b");
+    store().clearPath();
+    expect(store().hardDepsOnly).toBe(true);
+  });
+
+  it("toggling hard deps only drops the stale result", () => {
+    useGalaxyStore.setState({ pathEnds: { source: "a", target: "b" }, path: pathResult("a", "b") });
+    store().setHardDepsOnly(true);
+    expect(store().path).toBeNull();
+    expect(store().pathEnds).toEqual({ source: "a", target: "b" });
+  });
+
   it("loadNewGraph resets view parameters and bumps the epoch", () => {
     useGalaxyStore.setState({ collapsed: ["p"], depth: 2, root: "r", selectedId: "s" });
     useGalaxyStore.setState({ pathFrom: "x", pathEnds: { source: "a", target: "b" } });

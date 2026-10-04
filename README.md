@@ -26,7 +26,9 @@ subtrees, and find the shortest dependency paths between two nodes.
   of the galaxy dims; the **Path** card lists the hops (click one to fly
   to it). If no path follows dependencies from source to destination, the
   reverse direction is tried. Packs work as endpoints, collapsed packs
-  light up as orbs, and conflicts are never followed.
+  light up as orbs, and conflicts are never followed. When the galaxy
+  has optional dependencies (pacman feeds), tick **hard deps only** to
+  ignore them.
 - **Typed links** — edges carry a `link_type` styled by the legend:
   `dynamic` / `static` (ldd), `hard` / `optional` / `conflicts` (pacman).
   Conflicts are displayed but never followed by depth slicing.
@@ -77,7 +79,7 @@ The frontend proxies `/api/*` to the backend.
 | `POST /import` | Replace the graph with a `GraphPayload` (`nodes`, `edges`, `containment`) |
 | `GET /graph?collapsed=&depth=&root=` | Current view: collapsed packs (comma-separated), depth limit, slice root |
 | `GET /node/{id}` | Details of one node or pack |
-| `GET /path?from=&to=&collapsed=` | All shortest dependency paths between two nodes or packs (count, up to 10 listed, highlights mapped onto the collapsed view) |
+| `GET /path?from=&to=&collapsed=&exclude=` | All shortest dependency paths between two nodes or packs (count, up to 10 listed, highlights mapped onto the collapsed view); `exclude` lists link types not to follow, e.g. `optional` |
 | `GET /feeds` | Registered feeds and their availability |
 | `POST /feeds/{id}/run` | Build a feed and import it |
 

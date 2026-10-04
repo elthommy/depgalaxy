@@ -22,7 +22,7 @@ describe("usePath", () => {
       store().startPathPick("a");
       store().pickPathTarget("b");
     });
-    expect(fetchPath).toHaveBeenCalledWith("a", "b", []);
+    expect(fetchPath).toHaveBeenCalledWith("a", "b", [], []);
     await waitFor(() => expect(store().path?.target).toBe("b"));
   });
 
@@ -31,7 +31,7 @@ describe("usePath", () => {
     useGalaxyStore.setState({ pathEnds: { source: "a", target: "b" } });
     renderHook(() => usePath());
     act(() => store().togglePack("pack:net"));
-    await waitFor(() => expect(fetchPath).toHaveBeenLastCalledWith("a", "b", ["pack:net"]));
+    await waitFor(() => expect(fetchPath).toHaveBeenLastCalledWith("a", "b", ["pack:net"], []));
     expect(fetchPath).toHaveBeenCalledTimes(2);
   });
 
@@ -50,5 +50,13 @@ describe("usePath", () => {
     act(() => store().clearPath());
     await act(async () => resolve(pathResult("a", "b")));
     expect(store().path).toBeNull();
+  });
+
+  it("refetches without optional links when hard deps only is ticked", async () => {
+    const fetchPath = vi.spyOn(api, "fetchPath").mockResolvedValue(pathResult("a", "b"));
+    useGalaxyStore.setState({ pathEnds: { source: "a", target: "b" } });
+    renderHook(() => usePath());
+    act(() => store().setHardDepsOnly(true));
+    await waitFor(() => expect(fetchPath).toHaveBeenLastCalledWith("a", "b", [], ["optional"]));
   });
 });

@@ -58,6 +58,12 @@ describe("fetchPath", () => {
     expect(url.searchParams.get("collapsed")).toBe("p1,p2");
   });
 
+  it("sends the excluded link types", async () => {
+    const fetchMock = stubFetch({});
+    await fetchPath("a", "b", [], ["optional"]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/path?from=a&to=b&exclude=optional", undefined);
+  });
+
   it("omits collapsed when no pack is collapsed", async () => {
     const fetchMock = stubFetch({});
     await fetchPath("a", "b", []);

@@ -27,9 +27,15 @@ export function fetchNode(id: string): Promise<NodeDetails> {
   return request(`/api/node/${encodeURIComponent(id)}`);
 }
 
-export function fetchPath(source: string, target: string, collapsed: string[]): Promise<PathResult> {
+export function fetchPath(
+  source: string,
+  target: string,
+  collapsed: string[],
+  exclude: string[] = [],
+): Promise<PathResult> {
   const qs = new URLSearchParams({ from: source, to: target });
   if (collapsed.length > 0) qs.set("collapsed", collapsed.join(","));
+  if (exclude.length > 0) qs.set("exclude", exclude.join(","));
   return request(`/api/path?${qs}`);
 }
 

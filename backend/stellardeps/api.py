@@ -95,18 +95,22 @@ def get_path(
     source: str = Query(alias="from"),
     target: str = Query(alias="to"),
     collapsed: str = "",
+    exclude: str = "",
 ) -> PathResult:
     """Return all shortest dependency paths between two nodes or packs.
 
     `collapsed` (comma-separated pack ids) only affects the highlight
-    mapping. Unknown endpoints are 404; other invalid parameters are 400.
+    mapping. `exclude` (comma-separated link types, e.g. "optional") lists
+    edge link types not to follow. Unknown endpoints are 404; other
+    invalid parameters are 400.
     """
     graph = _require_graph()
     for node_id in (source, target):
         if node_id not in graph.nodes:
             raise HTTPException(status_code=404, detail=f"unknown node: {node_id!r}")
     collapsed_ids = [pack_id for pack_id in collapsed.split(",") if pack_id]
+    excluded = [link_type for link_type in exclude.split(",") if link_type]
     try:
-        return graph_engine.shortest_paths(graph, source, target, collapsed_ids)
+        return graph_engine.shortest_paths(graph, source, target, collapsed_ids, excluded)
     except GraphValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

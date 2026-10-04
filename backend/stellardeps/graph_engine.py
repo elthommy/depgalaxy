@@ -415,19 +415,24 @@ class _PathDag:
 
 
 def shortest_paths(
-    graph: DepGraph, source: str, target: str, collapsed: Iterable[str] = ()
+    graph: DepGraph,
+    source: str,
+    target: str,
+    collapsed: Iterable[str] = (),
+    exclude_link_types: Iterable[str] = (),
 ) -> PathResult:
     """Find all shortest dependency paths between two nodes (or packs).
 
     Dependency edges are followed from source to target first; if none
-    exists, from target to source ("reverse"). A pack endpoint stands for
-    itself and all of its transitive members. Highlights are mapped onto
-    the visible representatives for `collapsed`.
+    exists, from target to source ("reverse"). Edges whose `link_type` is
+    in `exclude_link_types` (e.g. "optional") are not followed. A pack
+    endpoint stands for itself and all of its transitive members.
+    Highlights are mapped onto the visible representatives for `collapsed`.
     """
     collapsed_set = frozenset(collapsed)
     _check_path_params(graph, source, target, collapsed_set)
     sources, targets = _scope(graph, source), _scope(graph, target)
-    succ = _dep_successors(graph)
+    succ = _dep_successors(graph, frozenset(exclude_link_types))
     direction: Literal["forward", "reverse"] = "forward"
     dag = _path_dag(succ, sources, targets)
     if dag is None:
@@ -458,11 +463,14 @@ def _scope(graph: DepGraph, node_id: str) -> set[str]:
     return {node_id} | _descendants(graph, node_id)
 
 
-def _dep_successors(graph: DepGraph) -> dict[str, set[str]]:
-    """Index dependency edges as node -> set of direct dependencies."""
+def _dep_successors(graph: DepGraph, excluded: frozenset[str] = frozenset()) -> dict[str, set[str]]:
+    """Index dependency edges as node -> set of direct dependencies.
+
+    Edges whose `link_type` attribute is in `excluded` are skipped.
+    """
     succ: dict[str, set[str]] = {}
     for edge in graph.edges:
-        if edge.relation == DEP_RELATION:
+        if edge.relation == DEP_RELATION and edge.attrs.get("link_type") not in excluded:
             succ.setdefault(edge.source, set()).add(edge.target)
     return succ
 

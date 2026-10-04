@@ -464,3 +464,44 @@ def test_path_highlights_drop_edges_inside_one_orb(galaxy):
 def test_path_rejects_invalid_requests(galaxy, source, target, collapsed, message):
     with pytest.raises(GraphValidationError, match=message):
         shortest_paths(galaxy, source, target, collapsed=collapsed)
+
+
+def typed_graph():
+    """a -optional-> c (short cut); a -hard-> b -hard-> c; c -optional-> d."""
+    return build_graph(
+        make_payload(
+            ["a", "b", "c", "d"],
+            edges=[
+                ("a", "c", {"link_type": "optional"}),
+                ("a", "b", {"link_type": "hard"}),
+                ("b", "c", {"link_type": "hard"}),
+                ("c", "d", {"link_type": "optional"}),
+            ],
+        )
+    )
+
+
+def test_path_follows_optional_links_by_default():
+    assert path_ids(shortest_paths(typed_graph(), "a", "c")) == [["a", "c"]]
+
+
+def test_excluded_link_types_lengthen_the_path():
+    result = shortest_paths(typed_graph(), "a", "c", exclude_link_types=["optional"])
+    assert path_ids(result) == [["a", "b", "c"]]
+    assert highlighted_edges(result) == [("a", "b"), ("b", "c")]
+
+
+def test_excluded_link_types_can_remove_the_path():
+    result = shortest_paths(typed_graph(), "a", "d", exclude_link_types=["optional"])
+    assert result.direction is None
+
+
+def test_excluded_link_types_apply_to_the_reverse_search():
+    assert shortest_paths(typed_graph(), "d", "a").direction == "reverse"
+    result = shortest_paths(typed_graph(), "d", "a", exclude_link_types=["optional"])
+    assert result.direction is None
+
+
+def test_excluding_an_absent_link_type_changes_nothing():
+    result = shortest_paths(typed_graph(), "a", "c", exclude_link_types=["dynamic"])
+    assert path_ids(result) == [["a", "c"]]

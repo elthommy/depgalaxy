@@ -24,6 +24,8 @@ interface GalaxyState {
   pathEnds: { source: string; target: string } | null;
   path: PathResult | null;
   pathError: string | null;
+  // path finder ignores optional dependencies (kept across searches)
+  hardDepsOnly: boolean;
 
   togglePack: (id: string) => void;
   collapseAll: () => void;
@@ -43,6 +45,7 @@ interface GalaxyState {
   clearPath: () => void;
   setPath: (path: PathResult) => void;
   setPathError: (error: string | null) => void;
+  setHardDepsOnly: (on: boolean) => void;
 }
 
 const NO_PATH = { pathFrom: null, pathEnds: null, path: null, pathError: null };
@@ -59,6 +62,7 @@ export const useGalaxyStore = create<GalaxyState>((set, get) => ({
   view: null,
   viewError: null,
   ...NO_PATH,
+  hardDepsOnly: false,
 
   togglePack: (id) =>
     set((state) => ({
@@ -104,4 +108,6 @@ export const useGalaxyStore = create<GalaxyState>((set, get) => ({
   clearPath: () => set(NO_PATH),
   setPath: (path) => set({ path, pathError: null }),
   setPathError: (error) => set({ pathError: error }),
+  // drop the result so the card shows "searching…" until the refetch lands
+  setHardDepsOnly: (on) => set({ hardDepsOnly: on, path: null, pathError: null }),
 }));
