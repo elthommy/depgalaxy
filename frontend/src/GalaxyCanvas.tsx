@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import SpriteText from "three-spritetext";
 import { DIM_NODE, LINK_STYLES, PATH_EDGE, kindColor } from "./palette";
+import { type LinkLayer, buildLinkLayer } from "./linkLayer";
 import { type PathHighlight, edgeKey, pathHighlight } from "./pathHighlight";
 import { simulationSettings } from "./simulation";
 import { useGalaxyStore } from "./store";
@@ -64,6 +65,9 @@ function linkMaterial(link: GLink): THREE.Material {
 function isPathLink(link: GLink, highlight: PathHighlight): boolean {
   return highlight.edges.has(edgeKey(link.source, link.target));
 }
+
+// react-force-graph only draws path links (see the batched link layer)
+const pathLinkMaterialFor = () => pathLinkMaterial;
 
 /** Radial-gradient sprite texture used for pack glow halos. */
 function makeHaloTexture(): THREE.Texture {
@@ -274,11 +278,31 @@ export default function GalaxyCanvas({
     [showLabels, nodeColor],
   );
 
-  const pathAwareLinkMaterial = useCallback(
-    (link: GLink) => {
-      if (!highlight) return linkMaterial(link);
-      return isPathLink(link, highlight) ? pathLinkMaterial : dimLinkMaterial;
-    },
+  // Links are drawn by our batched layer (one draw call per material);
+  // react-force-graph only draws the few path links, which need its
+  // per-link glow and particles. Off-path links dim while a path is shown.
+  const linkLayer = useRef<LinkLayer | null>(null);
+  useEffect(() => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const layer = buildLinkLayer(
+      highlight ? graphData.links.filter((l) => !isPathLink(l, highlight)) : graphData.links,
+      graphData.nodes,
+      (l) => (highlight ? dimLinkMaterial : linkMaterial(l)),
+    );
+    layer.update();
+    fg.scene().add(layer.object);
+    linkLayer.current = layer;
+    return () => {
+      fg.scene().remove(layer.object);
+      layer.dispose();
+      linkLayer.current = null;
+    };
+  }, [fgRef, graphData, highlight]);
+  const updateLinkLayer = useCallback(() => linkLayer.current?.update(), []);
+
+  const linkVisible = useCallback(
+    (link: GLink) => highlight !== null && isPathLink(link, highlight),
     [highlight],
   );
 
@@ -302,7 +326,8 @@ export default function GalaxyCanvas({
         // packs replace the default object; plain nodes keep their sphere under the label
         nodeThreeObjectExtend={(node) => !node.is_pack}
         nodeOpacity={0.85}
-        linkMaterial={pathAwareLinkMaterial}
+        linkVisibility={linkVisible}
+        linkMaterial={pathLinkMaterialFor}
         linkWidth={0}
         // particles flow along path links in dependency direction
         linkDirectionalParticles={linkParticles}
@@ -311,6 +336,9 @@ export default function GalaxyCanvas({
         linkDirectionalParticleColor={() => PATH_EDGE}
         onNodeClick={onNodeClick}
         onBackgroundClick={() => (pathFrom !== null ? cancelPathPick() : select(null))}
+        onEngineTick={updateLinkLayer}
+        onNodeDrag={updateLinkLayer}
+        onNodeDragEnd={updateLinkLayer}
         warmupTicks={simulation.warmupTicks}
         cooldownTime={simulation.cooldownTime}
         d3AlphaDecay={simulation.d3AlphaDecay}
