@@ -6,6 +6,7 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import SpriteText from "three-spritetext";
 import { DIM_NODE, LINK_STYLES, PATH_EDGE, kindColor } from "./palette";
 import { type PathHighlight, edgeKey, pathHighlight } from "./pathHighlight";
+import { simulationSettings } from "./simulation";
 import { useGalaxyStore } from "./store";
 import type { GraphView, ViewEdge, ViewNode } from "./types";
 
@@ -207,6 +208,10 @@ export default function GalaxyCanvas({
   }, [fgRef, autoRotate]);
 
   const graphData = useMemo(() => (view ? toGraphData(view) : { nodes: [], links: [] }), [view]);
+  const simulation = useMemo(
+    () => simulationSettings(graphData.nodes.length, graphData.links.length),
+    [graphData],
+  );
 
   // Fly the camera to a node picked from the search panel or a detail-panel row.
   useEffect(() => {
@@ -306,7 +311,10 @@ export default function GalaxyCanvas({
         linkDirectionalParticleColor={() => PATH_EDGE}
         onNodeClick={onNodeClick}
         onBackgroundClick={() => (pathFrom !== null ? cancelPathPick() : select(null))}
-        warmupTicks={60}
+        warmupTicks={simulation.warmupTicks}
+        cooldownTime={simulation.cooldownTime}
+        d3AlphaDecay={simulation.d3AlphaDecay}
+        d3AlphaMin={simulation.d3AlphaMin}
       />
       {viewError && !view && (
         <div
