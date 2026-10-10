@@ -1,4 +1,4 @@
-"""Pydantic models for the Stellardeps graph payloads."""
+"""Pydantic models for the DepGalaxy graph payloads."""
 
 from pydantic import BaseModel, Field
 

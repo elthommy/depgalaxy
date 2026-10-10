@@ -6,18 +6,18 @@ v1); every view is recomputed from it on each request.
 
 from fastapi import FastAPI, HTTPException, Query
 
-from stellardeps import feeds, graph_engine
-from stellardeps.feeds import FeedInfo, FeedUnavailableError
-from stellardeps.graph_engine import (
+from depgalaxy import feeds, graph_engine
+from depgalaxy.feeds import FeedInfo, FeedUnavailableError
+from depgalaxy.graph_engine import (
     DepGraph,
     GraphValidationError,
     GraphView,
     NodeDetails,
     PathResult,
 )
-from stellardeps.models import GraphPayload
+from depgalaxy.models import GraphPayload
 
-app = FastAPI(title="Stellardeps", version="0.1.0")
+app = FastAPI(title="DepGalaxy", version="0.1.0")
 
 _current_graph: DepGraph | None = None
 

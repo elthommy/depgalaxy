@@ -3,7 +3,7 @@ import tarfile
 
 import pytest
 
-from stellardeps import pacman
+from depgalaxy import pacman
 
 BASH_DESC = """\
 %NAME%

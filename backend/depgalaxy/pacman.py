@@ -3,7 +3,7 @@
 import tarfile
 from pathlib import Path
 
-from stellardeps.models import Edge, GraphPayload, Node
+from depgalaxy.models import Edge, GraphPayload, Node
 
 SYNC_DB_DIR = Path("/var/lib/pacman/sync")
 LOCAL_DB_DIR = Path("/var/lib/pacman/local")

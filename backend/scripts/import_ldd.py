@@ -1,10 +1,10 @@
-"""Import the dynamic dependencies of a local binary (via `ldd`) into Stellardeps."""
+"""Import the dynamic dependencies of a local binary (via `ldd`) into DepGalaxy."""
 
 import argparse
 
 import requests
 
-from stellardeps.ldd import ldd_payload
+from depgalaxy.ldd import ldd_payload
 
 
 def main() -> None:

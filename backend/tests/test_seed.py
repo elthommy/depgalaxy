@@ -1,6 +1,6 @@
-from stellardeps.graph_engine import build_graph
-from stellardeps.ldd import parse_ldd
-from stellardeps.seed import generate_demo_graph
+from depgalaxy.graph_engine import build_graph
+from depgalaxy.ldd import parse_ldd
+from depgalaxy.seed import generate_demo_graph
 
 LDD_OUTPUT = """\
 \tlinux-vdso.so.1 (0x00007ffcd1d92000)

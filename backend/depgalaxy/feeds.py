@@ -7,10 +7,10 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from stellardeps import pacman
-from stellardeps.ldd import LddError, ldd_payload
-from stellardeps.models import GraphPayload
-from stellardeps.seed import generate_demo_graph
+from depgalaxy import pacman
+from depgalaxy.ldd import LddError, ldd_payload
+from depgalaxy.models import GraphPayload
+from depgalaxy.seed import generate_demo_graph
 
 
 class FeedUnavailableError(RuntimeError):

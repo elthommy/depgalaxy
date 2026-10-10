@@ -1,10 +1,10 @@
-"""Parse `ldd` output into a Stellardeps GraphPayload."""
+"""Parse `ldd` output into a DepGalaxy GraphPayload."""
 
 import re
 import subprocess
 from pathlib import Path
 
-from stellardeps.models import Edge, GraphPayload, Node
+from depgalaxy.models import Edge, GraphPayload, Node
 
 
 class LddError(RuntimeError):

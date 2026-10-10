@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Start the Stellardeps dev stack: backend on :8000, frontend on :5173.
+# Start the DepGalaxy dev stack: backend on :8000, frontend on :5173.
 # Seeds the demo galaxy if no graph is loaded yet. Ctrl-C stops everything.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
-(cd backend && uv run uvicorn stellardeps.api:app --reload --port 8000) &
+(cd backend && uv run uvicorn depgalaxy.api:app --reload --port 8000) &
 
 # on exit, take the whole process group down (uvicorn reloader included)
 trap 'trap - EXIT INT TERM; kill 0 2>/dev/null' EXIT INT TERM
@@ -22,6 +22,6 @@ if curl -s http://127.0.0.1:8000/graph | grep -q "no graph imported"; then
 fi
 
 echo
-echo "Stellardeps: http://localhost:5173"
+echo "DepGalaxy: http://localhost:5173"
 echo
 (cd frontend && npm run dev)

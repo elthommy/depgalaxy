@@ -11,7 +11,7 @@ from typing import Literal
 import networkx as nx
 from pydantic import BaseModel, Field
 
-from stellardeps.models import Edge, GraphPayload, Node
+from depgalaxy.models import Edge, GraphPayload, Node
 
 
 class GraphValidationError(ValueError):

@@ -1,4 +1,4 @@
-# Stellardeps
+# DepGalaxy
 
 Explore arbitrary dependency graphs as an interactive 3D galaxy.
 
@@ -121,6 +121,22 @@ npm run typecheck   # tsc --noEmit
 ```
 
 The default branch is `master`.
+
+## How this was built
+
+Full disclosure: DepGalaxy is largely vibe coded, with
+[Claude Code](https://claude.com/claude-code) writing the code and Claude
+Design the UI mockup. I steered it step by step and backed it with tests
+and CI, but expect the code to read like it was written by an AI, because
+it was.
+
+## Acknowledgements
+
+DepGalaxy follows in the footsteps of
+[Software Galaxies](https://github.com/anvaka/pm) by Andrei Kashcha
+([@anvaka](https://github.com/anvaka)), which renders the dependency
+graphs of major package managers as 3D galaxies
+([live demo](https://anvaka.github.io/pm/)).
 
 ## License
 

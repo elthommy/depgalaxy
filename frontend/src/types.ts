@@ -1,4 +1,4 @@
-// Mirrors the backend pydantic view models (stellardeps/graph_engine.py).
+// Mirrors the backend pydantic view models (depgalaxy/graph_engine.py).
 
 export interface ViewNode {
   id: string;

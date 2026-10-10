@@ -1,7 +1,7 @@
 .PHONY: dev-backend dev-frontend seed seed-ldd test fmt
 
 dev-backend: ## FastAPI dev server on :8000
-	cd backend && uv run uvicorn stellardeps.api:app --reload
+	cd backend && uv run uvicorn depgalaxy.api:app --reload
 
 dev-frontend: ## Vite dev server on :5173 (proxies /api to :8000)
 	cd frontend && npm run dev

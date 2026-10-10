@@ -3,7 +3,7 @@ import subprocess
 import pytest
 from fastapi.testclient import TestClient
 
-from stellardeps import api, feeds, ldd
+from depgalaxy import api, feeds, ldd
 
 client = TestClient(api.app)
 

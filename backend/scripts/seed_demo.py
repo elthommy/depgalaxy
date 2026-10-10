@@ -1,10 +1,10 @@
-"""POST a generated demo galaxy to a running Stellardeps backend."""
+"""POST a generated demo galaxy to a running DepGalaxy backend."""
 
 import argparse
 
 import requests
 
-from stellardeps.seed import generate_demo_graph
+from depgalaxy.seed import generate_demo_graph
 
 
 def main() -> None:

@@ -1,13 +1,13 @@
 import pytest
 
-from stellardeps.graph_engine import (
+from depgalaxy.graph_engine import (
     GraphValidationError,
     build_graph,
     compute_view,
     node_details,
     shortest_paths,
 )
-from stellardeps.models import Containment, Edge, GraphPayload, Node
+from depgalaxy.models import Containment, Edge, GraphPayload, Node
 
 
 def make_payload(node_ids, edges=(), containment=()):

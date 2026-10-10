@@ -3,7 +3,7 @@ import { DYNAMIC_EDGE, MUTED, PACK_ACCENT_LIGHT, TEXT, kindColor, withAlpha } fr
 import { useGalaxyStore } from "../store";
 
 /**
- * Top-left: STELLARDEPS wordmark + search with client-side autocomplete.
+ * Top-left: DEPGALAXY wordmark + search with client-side autocomplete.
  * While a path search is in progress, picking a suggestion sets the path destination.
  */
 export default function SearchPanel() {
@@ -57,7 +57,7 @@ export default function SearchPanel() {
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "0 4px" }}>
         <div style={{ fontWeight: 600, letterSpacing: "0.22em", fontSize: 14, color: TEXT }}>
-          STELLARDEPS
+          DEPGALAXY
         </div>
         <div
           style={{
@@ -67,7 +67,7 @@ export default function SearchPanel() {
             textTransform: "uppercase",
           }}
         >
-          dependency galaxy
+          3D dependency explorer
         </div>
       </div>
       <div

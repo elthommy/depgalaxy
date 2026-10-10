@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from stellardeps import api
+from depgalaxy import api
 
 client = TestClient(api.app)
 

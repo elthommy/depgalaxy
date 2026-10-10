@@ -1,8 +1,8 @@
-"""Deterministic demo-graph generator for the Stellardeps galaxy."""
+"""Deterministic demo-graph generator for DepGalaxy."""
 
 import random
 
-from stellardeps.models import Containment, Edge, GraphPayload, Node
+from depgalaxy.models import Containment, Edge, GraphPayload, Node
 
 PACK_NAMES = (
     "nova",
