@@ -21,6 +21,11 @@ if curl -s http://127.0.0.1:8000/graph | grep -q "no graph imported"; then
     (cd backend && uv run python scripts/seed_demo.py)
 fi
 
+# reinstall frontend deps when the lockfile changed since the last install
+if [ frontend/package-lock.json -nt frontend/node_modules/.package-lock.json ]; then
+    (cd frontend && npm ci)
+fi
+
 echo
 echo "DepGalaxy: http://localhost:5173"
 echo
