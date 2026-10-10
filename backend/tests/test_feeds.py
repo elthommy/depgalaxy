@@ -71,7 +71,7 @@ def test_pacman_feed_unavailable_without_sync_db(tmp_path, monkeypatch):
 
 
 def test_run_ldd_success(monkeypatch):
-    def fake_run(cmd, capture_output, text):
+    def fake_run(cmd, capture_output, text, check):
         """Pretend ldd succeeded."""
         return subprocess.CompletedProcess(cmd, 0, stdout=LDD_OUTPUT, stderr="")
 
@@ -80,7 +80,7 @@ def test_run_ldd_success(monkeypatch):
 
 
 def test_run_ldd_failure_raises(monkeypatch):
-    def fake_run(cmd, capture_output, text):
+    def fake_run(cmd, capture_output, text, check):
         """Pretend ldd failed."""
         return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="no such file")
 

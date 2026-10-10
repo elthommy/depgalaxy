@@ -14,7 +14,7 @@ class LddError(RuntimeError):
 def run_ldd(binary: str) -> str:
     """Run ldd on `binary` and return its stdout; raise LddError on failure."""
     try:
-        result = subprocess.run(["ldd", binary], capture_output=True, text=True)
+        result = subprocess.run(["ldd", binary], capture_output=True, text=True, check=False)
     except FileNotFoundError as exc:
         raise LddError("ldd is not installed") from exc
     if result.returncode != 0:
