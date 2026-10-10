@@ -8,6 +8,10 @@ single orb. Load a demo galaxy, the dynamic libraries of a binary, or the
 whole Arch Linux package graph, then search, filter by depth, isolate
 subtrees, and find the shortest dependency paths between two nodes.
 
+![The demo galaxy: 2,000 nodes in 15 packs](docs/screenshots/galaxy.webp)
+
+![Shortest path from pacman to libcap in the Arch Linux core packages](docs/screenshots/path-finder.webp)
+
 ## Features
 
 - **3D galaxy canvas** — force-directed layout (`react-force-graph-3d`)
@@ -41,7 +45,9 @@ subtrees, and find the shortest dependency paths between two nodes.
   feed builders (demo, `ldd`, pacman).
 - `frontend/` — React + Vite + TypeScript, `react-force-graph-3d` canvas
   with a glassmorphic UI overlay, zustand store.
-- `design/` — Claude Design export used as the visual target for the UI.
+- `design/` — the original UI mockup, made with Claude Design and used as
+  the visual target (`preview.webp`). The `.dc.html` source needs the
+  Claude Design runtime, which is not included, to render.
 
 ## Quick start
 
