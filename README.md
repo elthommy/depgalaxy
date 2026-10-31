@@ -8,6 +8,8 @@ single orb. Load a demo galaxy, the dynamic libraries of a binary, or the
 whole Arch Linux package graph, then search, filter by depth, isolate
 subtrees, and find the shortest dependency paths between two nodes.
 
+[![DepGalaxy in 20 seconds](docs/media/depgalaxy-launch.jpg)](https://github.com/user-attachments/assets/89108174-b6c2-4f7a-8a19-f73bf99d958b)
+
 ![The demo galaxy: 2,000 nodes in 15 packs](docs/screenshots/galaxy.webp)
 
 ![Shortest path from pacman to libcap in the Arch Linux core packages](docs/screenshots/path-finder.webp)
@@ -137,6 +139,8 @@ DepGalaxy follows in the footsteps of
 ([@anvaka](https://github.com/anvaka)), which renders the dependency
 graphs of major package managers as 3D galaxies
 ([live demo](https://anvaka.github.io/pm/)).
+
+Launch video music: "Happy Beats / Business Moves Vol. 11" by Sascha Ende, ende.app (CC BY 4.0).
 
 ## License
 
